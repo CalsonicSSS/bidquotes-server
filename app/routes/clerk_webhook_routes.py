@@ -21,6 +21,7 @@ async def get_clerk_webhook_service(supabase_client: AsyncClient = Depends(get_s
 @webhook_router.post("/webhooks")
 async def clerk_webhook(request: Request, webhook_service: ClerkWebhookService = Depends(get_clerk_webhook_service)):
     """Handle Clerk webhook events"""
+    print("Received Clerk webhook event")
 
     try:
         # Get the raw body and headers
