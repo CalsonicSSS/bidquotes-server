@@ -12,12 +12,15 @@ clerk_auth_guard = ClerkHTTPBearer(config=clerk_config)
 async def get_current_clerk_user_id(credentials: Optional[HTTPAuthorizationCredentials] = Depends(clerk_auth_guard)) -> str:
     """Extract clerk user ID from JWT token"""
 
+    print("get_current_clerk_user_id called")
+
     if not credentials:
         raise ValidationError("Authentication required")
 
     # The decoded JWT payload is available in credentials.decoded
     # Clerk puts the user ID in the 'sub' claim
     clerk_user_id = credentials.decoded.get("sub")
+    print(f"Extracted clerk user ID: {clerk_user_id}")
 
     if not clerk_user_id:
         raise ValidationError("Invalid token: user ID not found")
