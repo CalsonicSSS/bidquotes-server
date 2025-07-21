@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-webhook_router = APIRouter(prefix="/clerk", tags=["Webhooks"])
+clerk_webhook_router = APIRouter(prefix="/clerk", tags=["Webhooks"])
 
 
 async def get_clerk_webhook_service(supabase_client: AsyncClient = Depends(get_supabase_client)) -> ClerkWebhookService:
@@ -18,7 +18,7 @@ async def get_clerk_webhook_service(supabase_client: AsyncClient = Depends(get_s
     return ClerkWebhookService(supabase_client)
 
 
-@webhook_router.post("/webhooks")
+@clerk_webhook_router.post("/webhooks")
 async def clerk_webhook(request: Request, webhook_service: ClerkWebhookService = Depends(get_clerk_webhook_service)):
     """Handle Clerk webhook events"""
     print("Received Clerk webhook event")
