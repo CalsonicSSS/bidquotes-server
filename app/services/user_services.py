@@ -61,11 +61,12 @@ class UserService:
 
             contact_data = buyer_contact_info.model_dump(exclude_unset=True)
 
+            # Update existing contact info
             if existing_result.data:
-                # Update existing contact info
+
                 result = await self.supabase_client.table("buyer_profiles").update(contact_data).eq("user_id", user_id).execute()
+            # Create new contact info
             else:
-                # Create new contact info
                 contact_data["user_id"] = user_id
                 result = await self.supabase_client.table("buyer_profiles").insert(contact_data).execute()
 
