@@ -10,8 +10,11 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_KEY: str
 
-    # Clerk webhook secret (we'll use this later)
+    # Clerk webhook secret
     CLERK_WEBHOOK_SECRET: Optional[str] = None
+
+    # Clerk JWT settings
+    CLERK_JWKS_URL: str
 
     # API Settings
     API_V1_STR: str = "/api/v1"

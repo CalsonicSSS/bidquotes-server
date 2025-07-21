@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.utils.supabase_client import create_supabase_client, close_supabase_client
+from app.utils.supabase_client_handlers import create_supabase_client, close_supabase_client
 from app.routes.user_routes import user_router
 from app.configs.app_settings import settings
 

@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends
 from supabase import AsyncClient
-from app.utils.supabase_client import get_supabase_client
-from app.services.user_service import UserService
-from app.models.user_models import BuyerContactInfoCreate, BuyerContactInfoResponse, BuyerContactInfoUpdate
+from app.utils.supabase_client_handlers import get_supabase_client
+from app.utils.user_auth import get_current_clerk_user_id
+from app.services.user_services import UserService
+from app.models.user_models import BuyerContactInfoCreate, BuyerContactInfoUpdate, BuyerContactInfoResponse
 from typing import Optional
-from app.configs.app_settings import settings
 
 user_router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -17,7 +17,7 @@ async def get_user_service(supabase: AsyncClient = Depends(get_supabase_client))
 @user_router.post("/buyer-contact-info", response_model=BuyerContactInfoResponse)
 async def save_buyer_contact_info(
     buyer_contact_info: BuyerContactInfoCreate | BuyerContactInfoUpdate,
-    clerk_user_id: str = Header(..., alias="x-clerk-user-id"),
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
     user_service: UserService = Depends(get_user_service),
 ):
     """Save buyer contact information"""
@@ -25,6 +25,6 @@ async def save_buyer_contact_info(
 
 
 @user_router.get("/buyer-contact-info", response_model=Optional[BuyerContactInfoResponse])
-async def get_buyer_contact_info(clerk_user_id: str = Header(..., alias="x-clerk-user-id"), user_service: UserService = Depends(get_user_service)):
+async def get_buyer_contact_info(clerk_user_id: str = Depends(get_current_clerk_user_id), user_service: UserService = Depends(get_user_service)):
     """Get buyer contact information"""
     return await user_service.get_buyer_contact_info(clerk_user_id)
