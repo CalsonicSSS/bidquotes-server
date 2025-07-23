@@ -59,16 +59,16 @@ class UserService:
             # Check if contact info already exists
             existing_result = await self.supabase_client.table("buyer_profiles").select("*").eq("user_id", user_id).execute()
 
-            contact_data = buyer_contact_info.model_dump(exclude_unset=True)
+            buyer_contact_info_prepared = buyer_contact_info.model_dump(exclude_unset=True)
 
             # Update existing contact info
             if existing_result.data:
 
-                result = await self.supabase_client.table("buyer_profiles").update(contact_data).eq("user_id", user_id).execute()
+                result = await self.supabase_client.table("buyer_profiles").update(buyer_contact_info_prepared).eq("user_id", user_id).execute()
             # Create new contact info
             else:
-                contact_data["user_id"] = user_id
-                result = await self.supabase_client.table("buyer_profiles").insert(contact_data).execute()
+                buyer_contact_info_prepared["user_id"] = user_id
+                result = await self.supabase_client.table("buyer_profiles").insert(buyer_contact_info_prepared).execute()
 
             if not result.data:
                 raise DatabaseError("Failed to save contact information")
