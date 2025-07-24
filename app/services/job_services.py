@@ -49,12 +49,9 @@ class JobService:
             storage_path = f"{job_id}/{uuid.uuid4()}.{file_extension}"
 
             # Upload to Supabase Storage
-            result = await self.supabase_client.storage.from_("job-images").upload(
+            await self.supabase_client.storage.from_("job-images").upload(
                 path=storage_path, file=file_content, file_options={"content-type": mimetypes.guess_type(file_name)[0] or "image/jpeg"}
             )
-
-            if result.get("error"):
-                raise DatabaseError(f"Failed to upload image: {result['error']}")
 
             # Get public URL
             image_url = self.supabase_client.storage.from_("job-images").get_public_url(storage_path)
@@ -108,12 +105,11 @@ class JobService:
             result = await self.supabase_client.table("job_images").select("storage_path").eq("job_id", job_id).execute()
 
             if result.data:
-                # Delete from storage
+                # Delete image file from storage
                 storage_paths = [img["storage_path"] for img in result.data if img.get("storage_path")]
-                storage_result = await self.supabase_client.storage.from_("job-images").remove(storage_paths)
-                if storage_result.get("error"):
-                    logger.warning(f"⚠️ Storage deletion warning: {storage_result['error']}")
+                await self.supabase_client.storage.from_("job-images").remove(storage_paths)
 
+                # Delete record from table
                 await self.supabase_client.table("job_images").delete().eq("job_id", job_id).execute()
 
                 logger.info(f"✅ Deleted {len(storage_paths)} images for job {job_id}")
@@ -122,9 +118,7 @@ class JobService:
 
         except Exception as e:
             logger.error(f"Error deleting job images: {str(e)}")
-            # Don't fail the whole operation if image cleanup fails
-            logger.warning(f"⚠️ Image cleanup failed but continuing: {str(e)}")
-            return False
+            raise ServerError(f"Error deleting job images: {str(e)}")
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -244,7 +238,7 @@ class JobService:
                 result = await self.supabase_client.table("jobs").select("*").eq("id", job_id).execute()
                 updated_job = JobResponse(**result.data[0])
 
-            # Handle image updates if provided
+            # Handle image
             if image_files:
                 await self._update_job_images(job_id, image_files)
 

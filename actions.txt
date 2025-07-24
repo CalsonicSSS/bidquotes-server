@@ -1,20 +1,20 @@
-- python -m venv venv 
+- "python -m venv venv" 
     - Create a virtual environment in a subfolder named venv
     - A virtual environment isolates project-specific Python packages from the global environment.
     - After this, there will be a venv folder inside your project root folder.
     - YOU TYPICALLY ONLY RUN THIS ONLY ONCE
 
-- venv\Scripts\activate
+- "venv\Scripts\activate"
     - Activate the virtual environment (specific to Windows).
     - Once activated, Python and pip commands will use the versions and packages from inside the venv directory, not the global ones.
 
-- pip install -r requirements.txt 
+- "pip install -r requirements.txt" 
     - install all the dependencies listed in the requirements.txt file.
 
-- pip freeze > requirements.txt 
+- "pip freeze > requirements.txt" 
     - The requirements.txt file doesn't automatically update when you install new packages. You need to explicitly update it
 
-- uvicorn app.main:app --reload 
+- "uvicorn app.main:app --reload" 
     - to start the fastapi process 
     - specifically under the "app" folder in "main" file for "app" declaraction
 
