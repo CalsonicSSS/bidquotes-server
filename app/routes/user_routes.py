@@ -9,9 +9,9 @@ from typing import Optional
 user_router = APIRouter(prefix="/users", tags=["Users"])
 
 
-async def get_user_service(supabase: AsyncClient = Depends(get_supabase_client)) -> UserService:
+async def get_user_service(supabase_client: AsyncClient = Depends(get_supabase_client)) -> UserService:
     """Dependency to get UserService instance"""
-    return UserService(supabase)
+    return UserService(supabase_client)
 
 
 @user_router.post("/buyer-contact-info", response_model=BuyerContactInfoResponse)

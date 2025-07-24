@@ -72,12 +72,15 @@ class JobResponse(BaseModel):
 class JobImageCreate(BaseModel):
     image_url: str
     image_order: int = 1
+    storage_path: str
+    image_order: int
 
 
 class JobImageResponse(BaseModel):
     id: str
     job_id: str
     image_url: str
+    storage_path: str
     image_order: int
     created_at: datetime
 

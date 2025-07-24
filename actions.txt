@@ -41,8 +41,8 @@ pip install -r requirements.txt
 
 deploy on render you need to add:
 
-build command: pip install -r requirements.txt
+- build command: pip install -r requirements.txt
 
-start command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+- start command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
-add additional env variable: "PORT: 8000"
+- add additional env variable: "PORT: 8000"
