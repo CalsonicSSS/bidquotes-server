@@ -14,20 +14,24 @@ async def get_job_service(supabase_client: AsyncClient = Depends(get_supabase_cl
     return JobService(supabase_client)
 
 
-async def process_uploaded_files(images: List[UploadFile]) -> List[Tuple[bytes, str]]:
-    """Helper to convert UploadFile objects to (bytes, filename) tuples"""
-    image_files = []
-    if images and images[0].filename:  # Check if actual files were uploaded
-        for upload_file in images:
-            if upload_file.filename and upload_file.size:  # Valid file
-                content = await upload_file.read()
-                image_files.append((content, upload_file.filename))
-    return image_files
+async def process_uploaded_files(uploaded_images: List[UploadFile]) -> List[Tuple[bytes, str]]:
+    """Helper to convert UploadFile objects to its (bytes, filename) tuples in list"""
+    processed_image_files = []
+    if uploaded_images and uploaded_images[0].filename:
+        for upload_image in uploaded_images:
+            if upload_image.filename and upload_image.size:
+                content = await upload_image.read()
+                filename = upload_image.filename
+                processed_image_files.append((content, filename))
+
+    return processed_image_files
 
 
 ########################################################################################################################
 
 
+# ... means this field is required
+# any other value will make this field optional with default value (so even if client side does not have field, fastapi will always have this field with default value)
 @job_router.post("", response_model=JobResponse)
 async def create_job(
     title: str = Form(...),
@@ -35,7 +39,7 @@ async def create_job(
     description: str = Form(...),
     location_address: str = Form(...),
     city: str = Form(...),
-    other_requirements: str = Form(""),
+    other_requirements: str = Form(None),
     images: List[UploadFile] = File(default=[]),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     job_service: JobService = Depends(get_job_service),
@@ -51,10 +55,10 @@ async def create_job(
         description=description,
         location_address=location_address,
         city=city,
-        other_requirements=other_requirements if other_requirements else None,
+        other_requirements=other_requirements,
     )
 
-    # Process images
+    # prepared images
     image_files = await process_uploaded_files(images)
 
     return await job_service.create_job(clerk_user_id, job_data, image_files)
@@ -65,12 +69,12 @@ async def create_job(
 
 @job_router.post("/drafts", response_model=JobResponse)
 async def save_job_draft(
-    title: str = Form(""),
-    job_type: str = Form(""),
-    description: str = Form(""),
-    location_address: str = Form(""),
-    city: str = Form(""),
-    other_requirements: str = Form(""),
+    title: str = Form(None),
+    job_type: str = Form(None),
+    description: str = Form(None),
+    location_address: str = Form(None),
+    city: str = Form(None),
+    other_requirements: str = Form(None),
     images: List[UploadFile] = File(default=[]),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     job_service: JobService = Depends(get_job_service),
@@ -81,12 +85,12 @@ async def save_job_draft(
 
     # Create draft data (all fields optional)
     draft_data = JobDraftCreate(
-        title=title if title else None,
-        job_type=job_type if job_type else None,
-        description=description if description else None,
-        location_address=location_address if location_address else None,
-        city=city if city else None,
-        other_requirements=other_requirements if other_requirements else None,
+        title=title,
+        job_type=job_type,
+        description=description,
+        location_address=location_address,
+        city=city,
+        other_requirements=other_requirements,
     )
 
     # Process images
@@ -129,15 +133,14 @@ async def update_job(
 # ------------------------------------------------------------------------------------------------------------------------
 
 
-@job_router.delete("/{job_id}")
+@job_router.delete("/{job_id}", response_model=bool)
 async def delete_job(
     job_id: str,
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     job_service: JobService = Depends(get_job_service),
 ):
     """Delete job and all associated data (images, bids, etc.)"""
-    success = await job_service.delete_job(clerk_user_id, job_id)
-    return {"message": "Job deleted successfully" if success else "Failed to delete job"}
+    return await job_service.delete_job(clerk_user_id, job_id)
 
 
 # ------------------------------------------------------------------------------------------------------------------------
