@@ -170,7 +170,7 @@ class JobService:
             user_id = await self._get_user_id(clerk_user_id)
 
             # Prepare draft data
-            draft_record = draft_data.model_dump(exclude_none=True)
+            draft_record = draft_data.model_dump()
             draft_record["buyer_id"] = user_id
             draft_record["status"] = JobStatus.DRAFT.value
 

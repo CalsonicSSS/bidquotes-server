@@ -59,9 +59,9 @@ async def create_job(
     )
 
     # prepared images
-    image_files = await process_uploaded_files(images)
+    processed_image_files = await process_uploaded_files(images)
 
-    return await job_service.create_job(clerk_user_id, job_data, image_files)
+    return await job_service.create_job(clerk_user_id, job_data, processed_image_files)
 
 
 # ------------------------------------------------------------------------------------------------------------------------
@@ -94,9 +94,9 @@ async def save_job_draft(
     )
 
     # Process images
-    image_files = await process_uploaded_files(images)
+    processed_image_files = await process_uploaded_files(images)
 
-    return await job_service.save_job_draft(clerk_user_id, draft_data, image_files)
+    return await job_service.save_job_draft(clerk_user_id, draft_data, processed_image_files)
 
 
 # ------------------------------------------------------------------------------------------------------------------------
@@ -125,9 +125,9 @@ async def update_job(
     )
 
     # Process images
-    image_files = await process_uploaded_files(images)
+    processed_image_files = await process_uploaded_files(images)
 
-    return await job_service.update_job(clerk_user_id, job_id, job_data, image_files)
+    return await job_service.update_job(clerk_user_id, job_id, job_data, processed_image_files)
 
 
 # ------------------------------------------------------------------------------------------------------------------------
