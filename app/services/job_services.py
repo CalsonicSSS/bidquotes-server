@@ -196,7 +196,9 @@ class JobService:
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
-    async def update_job(self, clerk_user_id: str, job_id: str, job_data: JobUpdate, image_files: List[Tuple[bytes, str]] = None) -> JobResponse:
+    async def update_job(
+        self, clerk_user_id: str, job_id: str, job_data: JobUpdate, is_draft_post: bool, image_files: List[Tuple[bytes, str]] = None
+    ) -> JobResponse:
         """Update existing job with optional image changes"""
         try:
             user_id = await self._get_user_id(clerk_user_id)
@@ -213,18 +215,18 @@ class JobService:
             # Update job data if provided
             job_record_updates = job_data.model_dump(exclude_none=True)
 
-            if not job_record_updates and not image_files:
-                raise ValidationError("No changes to update")
-
-            # Update job record if there are field changes
-            if job_record_updates:
+            # Update job record (for draft and also draft for posting case)
+            if current_status == JobStatus.DRAFT.value and is_draft_post:
+                job_record_updates["status"] = JobStatus.OPEN.value
                 result = await self.supabase_client.table("jobs").update(job_record_updates).eq("id", job_id).execute()
                 if not result.data:
                     raise DatabaseError("Failed to update your job info")
                 updated_job = JobResponse(**result.data[0])
+
             else:
-                # Get current job data if only updating images
-                result = await self.supabase_client.table("jobs").select("*").eq("id", job_id).execute()
+                result = await self.supabase_client.table("jobs").update(job_record_updates).eq("id", job_id).execute()
+                if not result.data:
+                    raise DatabaseError("Failed to update your job info")
                 updated_job = JobResponse(**result.data[0])
 
             # Handle image

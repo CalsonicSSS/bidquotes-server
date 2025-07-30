@@ -105,6 +105,7 @@ async def save_job_draft(
 @job_router.put("/{job_id}", response_model=JobResponse)
 async def update_job(
     job_id: str,
+    is_draft_post: bool = Query(False, alias="is-draft-post"),
     title: str = Form(None),
     job_type: str = Form(None),
     description: str = Form(None),
@@ -127,7 +128,7 @@ async def update_job(
     # Process images
     processed_image_files = await process_uploaded_files(images)
 
-    return await job_service.update_job(clerk_user_id, job_id, job_data, processed_image_files)
+    return await job_service.update_job(clerk_user_id, job_id, job_data, is_draft_post, processed_image_files)
 
 
 # ------------------------------------------------------------------------------------------------------------------------

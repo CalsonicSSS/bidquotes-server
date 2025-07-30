@@ -14,6 +14,9 @@ async def get_user_service(supabase_client: AsyncClient = Depends(get_supabase_c
     return UserService(supabase_client)
 
 
+#############################################################################################################################################
+
+
 @user_router.post("/buyer-contact-info", response_model=BuyerContactInfoResponse)
 async def save_buyer_contact_info(
     buyer_contact_info: BuyerContactInfoCreate | BuyerContactInfoUpdate,
