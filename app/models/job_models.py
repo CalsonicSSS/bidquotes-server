@@ -13,6 +13,7 @@ class JobType(str, Enum):
     BACKYARD = "Backyard"
     FENCING_DECKING = "Fencing & Decking"
     DESIGN = "Design"
+    DEFAULT = ""
 
 
 class JobStatus(str, Enum):

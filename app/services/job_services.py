@@ -41,7 +41,7 @@ class JobService:
     # INTERNAL IMAGE PROCESSING METHODS
     # =====================================================================================================
 
-    async def _upload_single_image(self, file_content: bytes, file_name: str, job_id: str) -> Tuple[str, str]:
+    async def _upload_single_image(self, file_content: bytes, file_name: str, job_id: str) -> tuple[str, str]:
         """Internal: Upload single image and return (image_url, storage_path)"""
         try:
             # Generate storage path
@@ -64,7 +64,7 @@ class JobService:
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
-    async def _upload_to_storage_create_image_records(self, job_id: str, image_files: List[Tuple[bytes, str]]) -> None:
+    async def _upload_to_storage_create_image_records(self, job_id: str, image_files: list[tuple[bytes, str]]) -> None:
         """Internal: loop multiple image files to upload for storage and create image record"""
         if not image_files:
             return
@@ -102,7 +102,7 @@ class JobService:
                 storage_paths = [img["storage_path"] for img in result.data if img.get("storage_path")]
                 await self.supabase_client.storage.from_("job-images").remove(storage_paths)
 
-                # Delete record from table
+                # Delete all image records from job_images table
                 await self.supabase_client.table("job_images").delete().eq("job_id", job_id).execute()
 
                 logger.info(f"✅ Deleted {len(storage_paths)} images for job {job_id}")
@@ -215,8 +215,8 @@ class JobService:
             # Update job data if provided
             job_record_updates = job_data.model_dump(exclude_none=True)
 
-            # Update job record (for draft and also draft for posting case)
-            if current_status == JobStatus.DRAFT.value and is_draft_post:
+            # Update job record (handle for both draft and regular update cases)
+            if is_draft_post:
                 job_record_updates["status"] = JobStatus.OPEN.value
                 result = await self.supabase_client.table("jobs").update(job_record_updates).eq("id", job_id).execute()
                 if not result.data:

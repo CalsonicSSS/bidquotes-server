@@ -14,32 +14,21 @@ class UserService:
     def __init__(self, supabase_client: AsyncClient):
         self.supabase_client = supabase_client
 
-    async def create_or_get_user(self, clerk_user_id: str, email: str, user_type: str) -> UserResponse:
-        """Create a new user or get existing user by clerk_user_id"""
+    async def _get_user_id(self, clerk_user_id: str) -> str:
+        """Helper method to get user_id from clerk_user_id"""
         try:
-            # First, try to get existing user
-            result = await self.supabase_client.table("users").select("*").eq("clerk_user_id", clerk_user_id).execute()
-
-            if result.data:
-                # User exists, return it
-                user_data = result.data[0]
-                return UserResponse(**user_data)
-
-            # User doesn't exist, create new one
-            user_data = {"clerk_user_id": clerk_user_id, "email": email, "user_type": user_type}
-
-            result = await self.supabase_client.table("users").insert(user_data).execute()
+            result = await self.supabase_client.table("users").select("id").eq("clerk_user_id", clerk_user_id).execute()
 
             if not result.data:
-                raise DatabaseError("Failed to create user")
+                raise UserNotFoundError()
 
-            return UserResponse(**result.data[0])
+            return result.data[0]["id"]
 
         except Exception as e:
-            logger.error(f"Error in create_or_get_user: {str(e)}")
-            if isinstance(e, (UserNotFoundError, DatabaseError)):
+            logger.error(f"Error getting user_id - {str(e)}")
+            if isinstance(e, UserNotFoundError):
                 raise e
-            raise ServerError(f"Server operation failed: {str(e)}")
+            raise ServerError(f"Failed to get user id")
 
     # -----------------------------------------------------------------------------------------------------------------------
 
@@ -48,13 +37,8 @@ class UserService:
     ) -> BuyerContactInfoResponse:
         """Save or update buyer contact information"""
         try:
-            # First, get the user
-            user_result = await self.supabase_client.table("users").select("id").eq("clerk_user_id", clerk_user_id).execute()
-
-            if not user_result.data:
-                raise UserNotFoundError()
-
-            user_id = user_result.data[0]["id"]
+            # First, get the user id
+            user_id = await self._get_user_id(clerk_user_id)
 
             # Check if contact info already exists
             existing_result = await self.supabase_client.table("buyer_profiles").select("*").eq("user_id", user_id).execute()
@@ -86,13 +70,8 @@ class UserService:
     async def get_buyer_contact_info(self, clerk_user_id: str) -> Optional[BuyerContactInfoResponse]:
         """Get buyer contact information by clerk_user_id"""
         try:
-            # Get user first
-            user_result = await self.supabase_client.table("users").select("id").eq("clerk_user_id", clerk_user_id).execute()
-
-            if not user_result.data:
-                raise UserNotFoundError()
-
-            user_id = user_result.data[0]["id"]
+            # First, get the user id
+            user_id = await self._get_user_id(clerk_user_id)
 
             # Get contact info
             result = await self.supabase_client.table("buyer_profiles").select("*").eq("user_id", user_id).execute()
