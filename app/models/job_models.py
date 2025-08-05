@@ -27,6 +27,7 @@ class JobStatus(str, Enum):
 class JobCreate(BaseModel):
     title: str
     job_type: JobType
+    job_budget: str
     description: str
     location_address: str
     city: str
@@ -36,6 +37,7 @@ class JobCreate(BaseModel):
 class JobUpdate(BaseModel):
     title: Optional[str] = None
     job_type: Optional[JobType] = None
+    job_budget: Optional[str] = None
     description: Optional[str] = None
     location_address: Optional[str] = None
     city: Optional[str] = None
@@ -45,6 +47,7 @@ class JobUpdate(BaseModel):
 class JobDraftCreate(BaseModel):
     title: Optional[str] = None
     job_type: Optional[JobType] = None
+    job_budget: Optional[str] = None
     description: Optional[str] = None
     location_address: Optional[str] = None
     city: Optional[str] = None
@@ -56,6 +59,7 @@ class JobResponse(BaseModel):
     buyer_id: str
     title: str
     job_type: JobType
+    job_budget: str
     description: str
     location_address: str
     city: str
@@ -94,6 +98,7 @@ class JobDetailViewResponse(BaseModel):
     buyer_id: str
     title: str
     job_type: JobType
+    job_budget: str
     description: str
     location_address: str
     city: str

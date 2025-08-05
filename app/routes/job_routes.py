@@ -36,6 +36,7 @@ async def process_uploaded_files(uploaded_images: List[UploadFile]) -> List[Tupl
 async def create_job(
     title: str = Form(...),
     job_type: str = Form(...),
+    job_budget: str = Form(...),
     description: str = Form(...),
     location_address: str = Form(...),
     city: str = Form(...),
@@ -52,6 +53,7 @@ async def create_job(
     job_data = JobCreate(
         title=title,
         job_type=job_type,
+        job_budget=job_budget,
         description=description,
         location_address=location_address,
         city=city,
@@ -71,6 +73,7 @@ async def create_job(
 async def save_job_draft(
     title: str = Form(None),
     job_type: str = Form(None),
+    job_budget: str = Form(None),
     description: str = Form(None),
     location_address: str = Form(None),
     city: str = Form(None),
@@ -87,6 +90,7 @@ async def save_job_draft(
     draft_data = JobDraftCreate(
         title=title,
         job_type=job_type,
+        job_budget=job_budget,
         description=description,
         location_address=location_address,
         city=city,
@@ -108,6 +112,7 @@ async def update_job(
     is_draft_post: bool = Query(False, alias="is-draft-post"),
     title: str = Form(None),
     job_type: str = Form(None),
+    job_budget: str = Form(None),
     description: str = Form(None),
     location_address: str = Form(None),
     city: str = Form(None),
@@ -122,7 +127,13 @@ async def update_job(
 
     # Create update data (only include provided fields)
     job_data = JobUpdate(
-        title=title, job_type=job_type, description=description, location_address=location_address, city=city, other_requirements=other_requirements
+        title=title,
+        job_type=job_type,
+        job_budget=job_budget,
+        description=description,
+        location_address=location_address,
+        city=city,
+        other_requirements=other_requirements,
     )
 
     # Process images
