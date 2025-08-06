@@ -1,5 +1,5 @@
 from supabase import AsyncClient
-from app.models.user_models import BuyerContactInfoCreate, BuyerContactInfoResponse, BuyerContactInfoUpdate, UserCreate, UserResponse
+from app.models.buyer_models import BuyerContactInfoCreate, BuyerContactInfoResponse, BuyerContactInfoUpdate
 from app.custom_error import UserNotFoundError, ContactInfoNotFoundError, DatabaseError, ServerError
 from typing import Optional
 import logging

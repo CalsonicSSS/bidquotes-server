@@ -3,7 +3,7 @@ from supabase import AsyncClient
 from app.utils.supabase_client_handlers import get_supabase_client
 from app.utils.user_auth import get_current_clerk_user_id
 from app.services.user_services import UserService
-from app.models.user_models import BuyerContactInfoCreate, BuyerContactInfoUpdate, BuyerContactInfoResponse
+from app.models.buyer_models import BuyerContactInfoCreate, BuyerContactInfoUpdate, BuyerContactInfoResponse
 from typing import Optional
 
 user_router = APIRouter(prefix="/users", tags=["Users"])

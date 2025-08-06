@@ -6,6 +6,7 @@ from app.routes.user_routes import user_router
 from app.routes.clerk_webhook_routes import clerk_webhook_router
 from app.configs.app_settings import settings
 from app.routes.job_routes import job_router
+from app.routes.contractor_profile_routes import contractor_router
 from fastapi.exceptions import RequestValidationError
 from app.custom_error import EmailValidationError
 
@@ -57,6 +58,7 @@ app.add_middleware(
 app.include_router(user_router, prefix=settings.API_V1_STR)
 app.include_router(clerk_webhook_router, prefix=settings.API_V1_STR)
 app.include_router(job_router, prefix=settings.API_V1_STR)
+app.include_router(contractor_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

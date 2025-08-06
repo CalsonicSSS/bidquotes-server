@@ -1,0 +1,118 @@
+# Add to app/routes/user_routes.py or create app/routes/contractor_routes.py
+
+from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException
+from supabase import AsyncClient
+from app.utils.supabase_client_handlers import get_supabase_client
+from app.utils.user_auth import get_current_clerk_user_id
+from app.services.contractor_services import ContractorProfileService
+from app.models.contractor_models import ContractorProfileCreate, ContractorProfileUpdate, ContractorProfileResponse, ContractorType
+from typing import Optional, List, Tuple
+
+contractor_router = APIRouter(prefix="/contractors", tags=["Contractors"])
+
+
+async def get_contractor_service(supabase_client: AsyncClient = Depends(get_supabase_client)) -> ContractorProfileService:
+    """Dependency to get ContractorProfileService instance"""
+    return ContractorProfileService(supabase_client)
+
+
+async def process_uploaded_profile_files(uploaded_images: List[UploadFile]) -> List[Tuple[bytes, str]]:
+    """Helper to convert UploadFile objects to (bytes, filename) tuples"""
+    processed_image_files = []
+    if uploaded_images and uploaded_images[0].filename:
+        for upload_image in uploaded_images:
+            if upload_image.filename and upload_image.size:
+                content = await upload_image.read()
+                filename = upload_image.filename
+                processed_image_files.append((content, filename))
+
+    return processed_image_files
+
+
+#############################################################################################################################################
+
+
+@contractor_router.get("/profile", response_model=Optional[ContractorProfileResponse])
+async def get_contractor_profile(
+    clerk_user_id: str = Depends(get_current_clerk_user_id), contractor_service: ContractorProfileService = Depends(get_contractor_service)
+):
+    """Get contractor profile information with images"""
+    return await contractor_service.get_contractor_profile(clerk_user_id)
+
+
+@contractor_router.get("/profile/completion-status", response_model=bool)
+async def check_contractor_profile_completion(
+    clerk_user_id: str = Depends(get_current_clerk_user_id), contractor_service: ContractorProfileService = Depends(get_contractor_service)
+):
+    """Check if contractor profile is complete"""
+    return await contractor_service.is_contractor_profile_complete(clerk_user_id)
+
+
+@contractor_router.post("/profile", response_model=ContractorProfileResponse)
+async def save_contractor_profile(
+    contractor_name: str = Form(...),
+    main_service_areas: str = Form(...),  # Simple text field
+    years_of_experience: int = Form(...),
+    contractor_type: str = Form(...),
+    team_size: int = Form(...),
+    company_website: Optional[str] = Form(None),
+    additional_information: Optional[str] = Form(None),
+    images: List[UploadFile] = File(default=[]),
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    contractor_service: ContractorProfileService = Depends(get_contractor_service),
+):
+    """Save contractor profile information with optional work sample images"""
+
+    if len(images) > 6:
+        raise HTTPException(status_code=400, detail="Maximum 6 images allowed per profile")
+
+    # Create profile data (no JSON parsing needed)
+    profile_data = ContractorProfileCreate(
+        contractor_name=contractor_name,
+        main_service_areas=main_service_areas,
+        years_of_experience=years_of_experience,
+        contractor_type=ContractorType(contractor_type),
+        team_size=team_size,
+        company_website=company_website,
+        additional_information=additional_information,
+    )
+
+    # Process images
+    processed_image_files = await process_uploaded_profile_files(images)
+
+    return await contractor_service.save_contractor_profile(clerk_user_id, profile_data, processed_image_files)
+
+
+@contractor_router.put("/profile", response_model=ContractorProfileResponse)
+async def update_contractor_profile(
+    contractor_name: Optional[str] = Form(None),
+    main_service_areas: Optional[str] = Form(None),  # Simple text field
+    years_of_experience: Optional[int] = Form(None),
+    contractor_type: Optional[str] = Form(None),
+    team_size: Optional[int] = Form(None),
+    company_website: Optional[str] = Form(None),
+    additional_information: Optional[str] = Form(None),
+    images: List[UploadFile] = File(default=[]),
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    contractor_service: ContractorProfileService = Depends(get_contractor_service),
+):
+    """Update contractor profile information with optional work sample images"""
+
+    if len(images) > 6:
+        raise HTTPException(status_code=400, detail="Maximum 6 images allowed per profile")
+
+    # Create update data (only include provided fields, no JSON parsing)
+    update_data = ContractorProfileUpdate(
+        contractor_name=contractor_name,
+        main_service_areas=main_service_areas,
+        years_of_experience=years_of_experience,
+        contractor_type=ContractorType(contractor_type) if contractor_type else None,
+        team_size=team_size,
+        company_website=company_website,
+        additional_information=additional_information,
+    )
+
+    # Process images
+    processed_image_files = await process_uploaded_profile_files(images)
+
+    return await contractor_service.save_contractor_profile(clerk_user_id, update_data, processed_image_files)
