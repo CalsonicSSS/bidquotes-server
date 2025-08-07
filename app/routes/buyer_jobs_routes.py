@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, Query, File, UploadFile, Form, HTTPExcep
 from supabase import AsyncClient
 from app.utils.supabase_client_handlers import get_supabase_client
 from app.utils.user_auth import get_current_clerk_user_id
-from app.services.job_services import JobService
+from app.services.buyer_jobs_services import JobService
 from app.models.job_models import JobCreate, JobUpdate, JobDraftCreate, JobResponse, JobDetailViewResponse, JobCardResponse
 from typing import List, Optional, Tuple
 
-job_router = APIRouter(prefix="/jobs", tags=["Jobs"])
+buyer_job_router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
 
 async def get_job_service(supabase_client: AsyncClient = Depends(get_supabase_client)) -> JobService:
@@ -32,7 +32,7 @@ async def process_uploaded_files(uploaded_images: List[UploadFile]) -> List[Tupl
 
 # ... means this field is required
 # any other value will make this field optional with default value (so even if client side does not have field, fastapi will always have this field with default value)
-@job_router.post("", response_model=JobResponse)
+@buyer_job_router.post("", response_model=JobResponse)
 async def create_job(
     title: str = Form(...),
     job_type: str = Form(...),
@@ -69,7 +69,7 @@ async def create_job(
 # ------------------------------------------------------------------------------------------------------------------------
 
 
-@job_router.post("/drafts", response_model=JobResponse)
+@buyer_job_router.post("/drafts", response_model=JobResponse)
 async def save_job_draft(
     title: str = Form(None),
     job_type: str = Form(None),
@@ -106,7 +106,7 @@ async def save_job_draft(
 # ------------------------------------------------------------------------------------------------------------------------
 
 
-@job_router.put("/{job_id}", response_model=JobResponse)
+@buyer_job_router.put("/{job_id}", response_model=JobResponse)
 async def update_job(
     job_id: str,
     is_draft_post: bool = Query(False, alias="is-draft-post"),
@@ -145,7 +145,7 @@ async def update_job(
 # ------------------------------------------------------------------------------------------------------------------------
 
 
-@job_router.delete("/{job_id}", response_model=bool)
+@buyer_job_router.delete("/{job_id}", response_model=bool)
 async def delete_job(
     job_id: str,
     clerk_user_id: str = Depends(get_current_clerk_user_id),
@@ -158,7 +158,7 @@ async def delete_job(
 # ------------------------------------------------------------------------------------------------------------------------
 
 
-@job_router.get("", response_model=List[JobCardResponse])
+@buyer_job_router.get("", response_model=List[JobCardResponse])
 async def get_buyer_jobs(
     status: Optional[str] = Query(None, description="Filter jobs by status (draft, open, full_bid, etc.)"),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
@@ -171,7 +171,7 @@ async def get_buyer_jobs(
 # ------------------------------------------------------------------------------------------------------------------------
 
 
-@job_router.get("/{job_id}", response_model=JobDetailViewResponse)
+@buyer_job_router.get("/{job_id}", response_model=JobDetailViewResponse)
 async def get_job_detail(
     job_id: str,
     clerk_user_id: str = Depends(get_current_clerk_user_id),

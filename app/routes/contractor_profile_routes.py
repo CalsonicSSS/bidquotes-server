@@ -1,17 +1,15 @@
-# Add to app/routes/user_routes.py or create app/routes/contractor_routes.py
-
 from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException
 from supabase import AsyncClient
 from app.utils.supabase_client_handlers import get_supabase_client
 from app.utils.user_auth import get_current_clerk_user_id
-from app.services.contractor_services import ContractorProfileService
+from app.services.contractor_profile_services import ContractorProfileService
 from app.models.contractor_models import ContractorProfileCreate, ContractorProfileUpdate, ContractorProfileResponse, ContractorType
 from typing import Optional, List, Tuple
 
-contractor_router = APIRouter(prefix="/contractors", tags=["Contractors"])
+contractor_profile_router = APIRouter(prefix="/contractors", tags=["Contractors"])
 
 
-async def get_contractor_service(supabase_client: AsyncClient = Depends(get_supabase_client)) -> ContractorProfileService:
+async def get_contractor_profile_service(supabase_client: AsyncClient = Depends(get_supabase_client)) -> ContractorProfileService:
     """Dependency to get ContractorProfileService instance"""
     return ContractorProfileService(supabase_client)
 
@@ -32,23 +30,23 @@ async def process_uploaded_profile_files(uploaded_images: List[UploadFile]) -> L
 #############################################################################################################################################
 
 
-@contractor_router.get("/profile", response_model=Optional[ContractorProfileResponse])
+@contractor_profile_router.get("/profile", response_model=Optional[ContractorProfileResponse])
 async def get_contractor_profile(
-    clerk_user_id: str = Depends(get_current_clerk_user_id), contractor_service: ContractorProfileService = Depends(get_contractor_service)
+    clerk_user_id: str = Depends(get_current_clerk_user_id), contractor_service: ContractorProfileService = Depends(get_contractor_profile_service)
 ):
     """Get contractor profile information with images"""
     return await contractor_service.get_contractor_profile(clerk_user_id)
 
 
-@contractor_router.get("/profile/completion-status", response_model=bool)
+@contractor_profile_router.get("/profile/completion-status", response_model=bool)
 async def check_contractor_profile_completion(
-    clerk_user_id: str = Depends(get_current_clerk_user_id), contractor_service: ContractorProfileService = Depends(get_contractor_service)
+    clerk_user_id: str = Depends(get_current_clerk_user_id), contractor_service: ContractorProfileService = Depends(get_contractor_profile_service)
 ):
     """Check if contractor profile is complete"""
     return await contractor_service.is_contractor_profile_complete(clerk_user_id)
 
 
-@contractor_router.post("/profile", response_model=ContractorProfileResponse)
+@contractor_profile_router.post("/profile", response_model=ContractorProfileResponse)
 async def save_contractor_profile(
     contractor_name: str = Form(...),
     main_service_areas: str = Form(...),  # Simple text field
@@ -59,7 +57,7 @@ async def save_contractor_profile(
     additional_information: Optional[str] = Form(None),
     images: List[UploadFile] = File(default=[]),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
-    contractor_service: ContractorProfileService = Depends(get_contractor_service),
+    contractor_service: ContractorProfileService = Depends(get_contractor_profile_service),
 ):
     """Save contractor profile information with optional work sample images"""
 
@@ -83,7 +81,7 @@ async def save_contractor_profile(
     return await contractor_service.save_contractor_profile(clerk_user_id, profile_data, processed_image_files)
 
 
-@contractor_router.put("/profile", response_model=ContractorProfileResponse)
+@contractor_profile_router.put("/profile", response_model=ContractorProfileResponse)
 async def update_contractor_profile(
     contractor_name: Optional[str] = Form(None),
     main_service_areas: Optional[str] = Form(None),  # Simple text field
@@ -94,7 +92,7 @@ async def update_contractor_profile(
     additional_information: Optional[str] = Form(None),
     images: List[UploadFile] = File(default=[]),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
-    contractor_service: ContractorProfileService = Depends(get_contractor_service),
+    contractor_service: ContractorProfileService = Depends(get_contractor_profile_service),
 ):
     """Update contractor profile information with optional work sample images"""
 

@@ -5,8 +5,11 @@ from app.utils.supabase_client_handlers import create_supabase_client, close_sup
 from app.routes.user_routes import user_router
 from app.routes.clerk_webhook_routes import clerk_webhook_router
 from app.configs.app_settings import settings
-from app.routes.job_routes import job_router
-from app.routes.contractor_profile_routes import contractor_router
+from app.routes.buyer_jobs_routes import buyer_job_router
+from app.routes.contractor_jobs_routes import contractor_jobs_router
+from app.routes.contractor_profile_routes import contractor_profile_router
+
+
 from fastapi.exceptions import RequestValidationError
 from app.custom_error import EmailValidationError
 
@@ -57,8 +60,9 @@ app.add_middleware(
 # Include routers
 app.include_router(user_router, prefix=settings.API_V1_STR)
 app.include_router(clerk_webhook_router, prefix=settings.API_V1_STR)
-app.include_router(job_router, prefix=settings.API_V1_STR)
-app.include_router(contractor_router, prefix=settings.API_V1_STR)
+app.include_router(buyer_job_router, prefix=settings.API_V1_STR)
+app.include_router(contractor_profile_router, prefix=settings.API_V1_STR)
+app.include_router(contractor_jobs_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

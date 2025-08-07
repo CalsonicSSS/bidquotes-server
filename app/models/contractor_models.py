@@ -1,6 +1,4 @@
-# Add this to app/models/user_models.py (or create app/models/contractor_models.py)
-
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -17,7 +15,7 @@ class ContractorProfileCreate(BaseModel):
     years_of_experience: int
     contractor_type: ContractorType
     team_size: int
-    company_website: Optional[HttpUrl] = None
+    company_website: Optional[str] = None
     additional_information: Optional[str] = None
 
 
@@ -27,7 +25,7 @@ class ContractorProfileUpdate(BaseModel):
     years_of_experience: Optional[int] = None
     contractor_type: Optional[ContractorType] = None
     team_size: Optional[int] = None
-    company_website: Optional[HttpUrl] = None
+    company_website: Optional[str] = None
     additional_information: Optional[str] = None
 
 

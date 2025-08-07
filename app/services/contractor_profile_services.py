@@ -1,5 +1,3 @@
-# Create app/services/contractor_services.py
-
 from supabase import AsyncClient
 from app.models.contractor_models import (  # Assuming you add the contractor models to user_models.py
     ContractorProfileCreate,
@@ -175,7 +173,7 @@ class ContractorProfileService:
             if not result.data:
                 raise DatabaseError("Failed to save contractor profile")
 
-            # Handle images if provided
+            # Handle images if provided with len(image_files) > 0
             if image_files:
                 # Delete existing images and upload new ones
                 await self._delete_profile_images(profile_id)

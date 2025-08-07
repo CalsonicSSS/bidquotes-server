@@ -121,3 +121,15 @@ class JobCardResponse(BaseModel):
     created_at: datetime
     # Include first image if available
     thumbnail_image: Optional[str] = None
+
+
+class ContractorJobCardResponse(BaseModel):
+    id: str
+    title: str
+    job_type: JobType
+    status: JobStatus
+    city: str  # Add city for contractors to see location
+    bid_count: int
+    created_at: datetime
+    # Include first image if available
+    thumbnail_image: Optional[str] = None
