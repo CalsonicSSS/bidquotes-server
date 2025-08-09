@@ -67,17 +67,35 @@ class BidService:
         result = await query.execute()
 
         if result.data:
-            raise ValidationError("You have already submitted a bid for this job")
+            raise ValidationError("You have already submitted a bid or saved a draft for this job")
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
-    def _validate_bid_data(self, price_min: str, price_max: str) -> None:
-        """Validate bid data"""
-        if float(price_min) < 0 or float(price_max) < 0:
-            raise ValidationError("Prices must be positive")
+    def _clean_price_string(self, price_str: str) -> float:
+        """Convert formatted price string to float"""
+        if not price_str:
+            return 0.0
+        # Remove currency symbols, commas, and spaces, then convert to float
+        cleaned = price_str.replace("$", "").replace(",", "").strip()
+        try:
+            return float(cleaned)
+        except ValueError:
+            raise ValidationError(f"Invalid price format: {price_str}")
 
-        if float(price_min) > float(price_max):
-            raise ValidationError("Minimum price cannot be greater than maximum price")
+    def _validate_bid_data(self, price_min: str, price_max: str) -> None:
+        """Validate bid data with formatted currency handling"""
+        try:
+            min_price = self._clean_price_string(price_min)
+            max_price = self._clean_price_string(price_max)
+
+            if min_price < 0 or max_price < 0:
+                raise ValidationError("Prices must be positive")
+
+            if min_price > max_price:
+                raise ValidationError("Minimum price cannot be greater than maximum price")
+
+        except ValueError as e:
+            raise ValidationError("Invalid price format provided")
 
     # =====================================================================================================
     # CORE BID OPERATIONS
@@ -174,10 +192,6 @@ class BidService:
             if current_bid["status"] not in [BidStatus.DRAFT.value, BidStatus.PENDING.value]:
                 raise ValidationError("Cannot edit bid in current status")
 
-            # Validate job is still available if submitting draft
-            if is_draft_submit:
-                await self._validate_job_available_for_bidding(current_bid["job_id"], contractor_id)
-
             # Prepare update data
             update_data = bid_data.model_dump(exclude_none=True)
 
@@ -189,6 +203,12 @@ class BidService:
 
             # Handle draft submission
             if is_draft_submit and current_bid["status"] == BidStatus.DRAFT.value:
+                # Basic validation - job should exist and be open
+                await self._validate_job_available_for_bidding(current_bid["job_id"], contractor_id)
+
+                # Validate no existing bid from this contractor
+                await self._validate_no_existing_bid(current_bid["job_id"], contractor_id)
+
                 update_data["status"] = BidStatus.PENDING.value
 
             # Update bid

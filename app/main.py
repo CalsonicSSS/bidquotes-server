@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.utils.supabase_client_handlers import create_supabase_client, close_supabase_client
@@ -35,14 +36,18 @@ app = FastAPI(title="Bidquotes API", version="1.0.0", lifespan=lifespan)
 # This only runs when there is any request Validation error only happens
 @app.exception_handler(RequestValidationError)
 async def custom_request_validation_exception_handler(request: Request, exc: RequestValidationError):
-    # Customize the error response
+    """Handle validation errors"""
     print("custom_request_validation_exception_handler runs")
+
     for error in exc.errors():
         loc = error.get("loc", [])
         field = loc[-1] if loc else None
 
         if field == "contact_email":
             raise EmailValidationError()
+
+    # Return a proper JSON response for other validation errors
+    return JSONResponse(status_code=400, content={"detail": "Validation error", "errors": exc.errors()})
 
 
 # Add CORS middleware
