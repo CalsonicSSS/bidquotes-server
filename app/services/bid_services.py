@@ -71,12 +71,12 @@ class BidService:
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
-    def _validate_bid_data(self, price_min: float, price_max: float) -> None:
+    def _validate_bid_data(self, price_min: str, price_max: str) -> None:
         """Validate bid data"""
-        if price_min < 0 or price_max < 0:
+        if float(price_min) < 0 or float(price_max) < 0:
             raise ValidationError("Prices must be positive")
 
-        if price_min > price_max:
+        if float(price_min) > float(price_max):
             raise ValidationError("Minimum price cannot be greater than maximum price")
 
     # =====================================================================================================

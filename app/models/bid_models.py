@@ -15,8 +15,8 @@ class BidStatus(str, Enum):
 class BidCreate(BaseModel):
     job_id: str
     title: str
-    price_min: float
-    price_max: float
+    price_min: str
+    price_max: str
     timeline_estimate: str
     work_description: str
     additional_notes: Optional[str] = None
@@ -24,8 +24,8 @@ class BidCreate(BaseModel):
 
 class BidUpdate(BaseModel):
     title: Optional[str] = None
-    price_min: Optional[float] = None
-    price_max: Optional[float] = None
+    price_min: Optional[str] = None
+    price_max: Optional[str] = None
     timeline_estimate: Optional[str] = None
     work_description: Optional[str] = None
     additional_notes: Optional[str] = None
@@ -34,8 +34,8 @@ class BidUpdate(BaseModel):
 class BidDraftCreate(BaseModel):
     job_id: str
     title: Optional[str] = None
-    price_min: Optional[float] = None
-    price_max: Optional[float] = None
+    price_min: Optional[str] = None
+    price_max: Optional[str] = None
     timeline_estimate: Optional[str] = None
     work_description: Optional[str] = None
     additional_notes: Optional[str] = None
@@ -46,8 +46,8 @@ class BidResponse(BaseModel):
     job_id: str
     contractor_id: str
     title: str
-    price_min: float
-    price_max: float
+    price_min: str
+    price_max: str
     timeline_estimate: str
     work_description: str
     additional_notes: Optional[str]
@@ -62,8 +62,8 @@ class BidDetailResponse(BaseModel):
     job_id: str
     contractor_id: str
     title: str
-    price_min: float
-    price_max: float
+    price_min: str
+    price_max: str
     timeline_estimate: str
     work_description: str
     additional_notes: Optional[str]
