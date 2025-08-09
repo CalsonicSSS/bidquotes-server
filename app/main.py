@@ -8,6 +8,7 @@ from app.configs.app_settings import settings
 from app.routes.buyer_jobs_routes import buyer_job_router
 from app.routes.contractor_jobs_routes import contractor_jobs_router
 from app.routes.contractor_profile_routes import contractor_profile_router
+from app.routes.bid_routes import bid_router
 
 
 from fastapi.exceptions import RequestValidationError
@@ -63,6 +64,7 @@ app.include_router(clerk_webhook_router, prefix=settings.API_V1_STR)
 app.include_router(buyer_job_router, prefix=settings.API_V1_STR)
 app.include_router(contractor_profile_router, prefix=settings.API_V1_STR)
 app.include_router(contractor_jobs_router, prefix=settings.API_V1_STR)
+app.include_router(bid_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

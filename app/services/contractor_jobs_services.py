@@ -1,6 +1,6 @@
 from supabase import AsyncClient
-from app.models.job_models import ContractorJobCardResponse
-from app.custom_error import UserNotFoundError, ServerError
+from app.models.job_models import ContractorJobCardResponse, JobDetailViewResponse, JobImageResponse
+from app.custom_error import UserNotFoundError, ServerError, ValidationError
 from typing import Optional, List
 import logging
 
@@ -97,6 +97,8 @@ class ContractorJobService:
                 raise e
             raise ServerError(f"Failed to fetch available jobs")
 
+    # --------------------------------------------------------------------------------------------------------------------------------------------
+
     async def get_job_cities(self) -> List[str]:
         """Get unique cities from all open jobs for filter dropdown"""
         try:
@@ -112,3 +114,59 @@ class ContractorJobService:
         except Exception as e:
             logger.error(f"Error getting job cities - {str(e)}")
             raise ServerError(f"Failed to fetch job cities")
+
+    # --------------------------------------------------------------------------------------------------------------------------------------------
+
+    async def get_job_detail_for_contractor(self, clerk_user_id: str, job_id: str) -> JobDetailViewResponse:
+        """Get complete job details for contractor review (without buyer contact info)"""
+        try:
+            user_id = await self._get_user_id(clerk_user_id)
+
+            # Get job with images - ensure it's an open job and not from this contractor
+            job_result = (
+                await self.supabase_client.table("jobs")
+                .select(
+                    """
+                    *, job_images(*)
+                """
+                )
+                .eq("id", job_id)
+                .eq("status", "open")  # Only allow viewing open jobs
+                .neq("buyer_id", user_id)  # Don't allow viewing own jobs if contractor is also buyer
+                .execute()
+            )
+
+            if not job_result.data:
+                raise ValidationError("Job is not available")
+
+            target_job_data = job_result.data[0]
+
+            # Get bid count for this job (non-draft bids only)
+            bid_result = (
+                await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").neq("status", "declined").execute()
+            )
+            bid_count = len(bid_result.data) if bid_result.data else 0
+
+            # Check if job is still available for bidding (less than 5 bids)
+            if bid_count >= 5:
+                raise ValidationError("This job is no longer accepting bids (full)")
+
+            # Format images
+            images = []
+            if target_job_data.get("job_images"):
+                for img in target_job_data["job_images"]:
+                    images.append(JobImageResponse(**img))
+                images.sort(key=lambda x: x.image_order)
+
+            # Prepare response data (exclude buyer-specific sensitive info)
+            response_data = {**target_job_data, "images": images, "bid_count": bid_count}
+            response_data.pop("job_images", None)  # Remove raw job_images field
+
+            logger.info(f"✅ Retrieved job detail for contractor: {job_id}")
+            return JobDetailViewResponse(**response_data)
+
+        except Exception as e:
+            logger.error(f"Error getting contractor job detail - {str(e)}")
+            if isinstance(e, (UserNotFoundError, ValidationError)):
+                raise e
+            raise ServerError(f"Failed to fetch job detail")
