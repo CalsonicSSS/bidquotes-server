@@ -1,7 +1,7 @@
 from supabase import AsyncClient
-from app.models.bid_models import BidCreate, BidUpdate, BidDraftCreate, BidResponse, BidDetailResponse, BidStatus
+from app.models.bid_models import BidCardResponse, BidCreate, BidUpdate, BidDraftCreate, BidResponse, BidDetailResponse, BidStatus
 from app.custom_error import UserNotFoundError, DatabaseError, ServerError, ValidationError
-from typing import Optional
+from typing import List, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -261,6 +261,59 @@ class BidService:
     # =====================================================================================================
     # BID READING OPERATIONS
     # =====================================================================================================
+
+    async def get_contractor_bid_cards(self, clerk_user_id: str, status_filter: Optional[str] = None) -> List[BidCardResponse]:
+        """Get bid cards for contractor dashboard"""
+        try:
+            contractor_id = await self._get_user_id(clerk_user_id)
+
+            # Build query to get bids with job information
+            query = (
+                self.supabase_client.table("bids")
+                .select(
+                    """
+                    id, job_id, title, status, created_at, updated_at,
+                    jobs(title, job_type, city)
+                    """
+                )
+                .eq("contractor_id", contractor_id)
+            )
+
+            if status_filter:
+                query = query.eq("status", status_filter)
+
+            # Order by latest first
+            query = query.order("created_at", desc=True)
+            result = await query.execute()
+
+            bid_cards = []
+            for bid_data in result.data:
+                job_info = bid_data.pop("jobs")  # Extract job info
+
+                # Create bid card with job context
+                bid_card = BidCardResponse(
+                    id=bid_data["id"],
+                    job_id=bid_data["job_id"],
+                    title=bid_data["title"] or "Untitled Bid",
+                    status=bid_data["status"],
+                    created_at=bid_data["created_at"],
+                    updated_at=bid_data["updated_at"],
+                    job_title=job_info["title"],
+                    job_type=job_info["job_type"],
+                    job_city=job_info["city"],
+                )
+                bid_cards.append(bid_card)
+
+            logger.info(f"✅ Retrieved {len(bid_cards)} bid cards for contractor")
+            return bid_cards
+
+        except Exception as e:
+            logger.error(f"Error getting contractor bid cards - {str(e)}")
+            if isinstance(e, UserNotFoundError):
+                raise e
+            raise ServerError(f"Failed to fetch bids")
+
+    # ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
     async def get_bid_detail(self, clerk_user_id: str, bid_id: str) -> BidDetailResponse:
         """Get complete bid details with job context"""

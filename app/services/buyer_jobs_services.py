@@ -364,7 +364,9 @@ class JobService:
             target_job_data = job_result.data[0]
 
             # Get bid count
-            bid_result = await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").execute()
+            bid_result = (
+                await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").neq("status", "declined").execute()
+            )
             bid_count = len(bid_result.data) if bid_result.data else 0
 
             # TODO: Get detailed bid information for buyer review

@@ -1,12 +1,12 @@
 # Create app/routes/bid_routes.py
 
-from fastapi import APIRouter, Depends, Form, Query, HTTPException
+from fastapi import APIRouter, Depends, Form, Query
 from supabase import AsyncClient
 from app.utils.supabase_client_handlers import get_supabase_client
 from app.utils.user_auth import get_current_clerk_user_id
-from app.services.bid_services import BidService
-from app.models.bid_models import BidCreate, BidUpdate, BidDraftCreate, BidResponse, BidDetailResponse
-from typing import Optional
+from app.services.contractor_bid_services import BidService
+from app.models.bid_models import BidCreate, BidUpdate, BidDraftCreate, BidResponse, BidDetailResponse, BidCardResponse
+from typing import Optional, List
 
 bid_router = APIRouter(prefix="/bids", tags=["Bids"])
 
@@ -133,3 +133,16 @@ async def get_bid_detail(
 ):
     """Get complete bid details with job context"""
     return await bid_service.get_bid_detail(clerk_user_id, bid_id)
+
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+
+@bid_router.get("/contractor-bids", response_model=List[BidCardResponse])
+async def get_contractor_bids(
+    status: Optional[str] = Query(None, description="Filter bids by status (draft, pending, selected, etc.)"),
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    bid_service: BidService = Depends(get_bid_service),
+):
+    """Get all bids for contractor dashboard with optional status filter"""
+    return await bid_service.get_contractor_bid_cards(clerk_user_id, status)

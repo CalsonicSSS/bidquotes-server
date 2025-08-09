@@ -57,6 +57,19 @@ class BidResponse(BaseModel):
     updated_at: datetime
 
 
+class BidCardResponse(BaseModel):
+    id: str
+    job_id: str
+    title: str
+    status: BidStatus
+    created_at: datetime
+    updated_at: datetime
+    # Job context info
+    job_title: str
+    job_type: str
+    job_city: str
+
+
 class BidDetailResponse(BaseModel):
     id: str
     job_id: str
