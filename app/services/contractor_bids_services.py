@@ -207,7 +207,7 @@ class BidService:
                 await self._validate_job_available_for_bidding(current_bid["job_id"], contractor_id)
 
                 # Validate no existing bid from this contractor
-                await self._validate_no_existing_bid(current_bid["job_id"], contractor_id)
+                # await self._validate_no_existing_bid(current_bid["job_id"], contractor_id)
 
                 update_data["status"] = BidStatus.PENDING.value
 
