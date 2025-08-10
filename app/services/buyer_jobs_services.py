@@ -66,8 +66,8 @@ class JobService:
 
     async def _upload_to_storage_create_image_records(self, job_id: str, image_files: list[tuple[bytes, str]]) -> None:
         """Internal: loop multiple image files to upload for storage and create image record"""
-        if not image_files:
-            return
+        # if not image_files:
+        #     return
 
         try:
 
@@ -91,7 +91,7 @@ class JobService:
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
-    async def _delete_job_image_records_and_storage(self, job_id: str) -> None:
+    async def _delete_job_images(self, job_id: str) -> None:
         """Internal: Delete all images for a job (both storage and database)"""
         try:
             # Get all image records for this job with their storage path
@@ -118,11 +118,10 @@ class JobService:
         try:
             # For simplicity in MVP: delete all existing images and add new ones
             # In production, you could implement smart diff logic here
-            await self._delete_job_image_records_and_storage(job_id)
+            await self._delete_job_images(job_id)
 
-            # Add new images
-            if new_image_files:
-                await self._upload_to_storage_create_image_records(job_id, new_image_files)
+            # always handle image even if its empty
+            await self._upload_to_storage_create_image_records(job_id, new_image_files)
 
         except Exception as e:
             logger.error(f"Error updating job images - {str(e)}")
@@ -229,9 +228,8 @@ class JobService:
                     raise DatabaseError("Failed to update your job info")
                 updated_job = JobResponse(**result.data[0])
 
-            # Handle image
-            if image_files:
-                await self._update_job_images(job_id, image_files)
+            # Handle image (always)
+            await self._update_job_images(job_id, image_files)
 
             logger.info(f"✅ Job updated with {len(image_files) if image_files else 0} image changes, at job id: {job_id}")
             return updated_job
@@ -259,7 +257,7 @@ class JobService:
                 raise ValidationError("Cannot delete job in current status")
 
             # Delete associated images from storage and records
-            await self._delete_job_image_records_and_storage(job_id)
+            await self._delete_job_images(job_id)
 
             # Delete job record (CASCADE will handle bids deletion as well)
             result = await self.supabase_client.table("jobs").delete().eq("id", job_id).execute()

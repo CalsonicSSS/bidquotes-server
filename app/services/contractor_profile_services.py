@@ -62,8 +62,8 @@ class ContractorProfileService:
 
     async def _upload_profile_images_create_records(self, profile_id: str, image_files: list[tuple[bytes, str]]) -> None:
         """Internal: Upload profile images and create database records"""
-        if not image_files:
-            return
+        # if not image_files:
+        #     return
 
         try:
             for index, (file_content, file_name) in enumerate(image_files, 1):
@@ -96,8 +96,7 @@ class ContractorProfileService:
             if result.data:
                 # Delete ALL images from storage
                 storage_paths = [img["storage_path"] for img in result.data if img.get("storage_path")]
-                if storage_paths:
-                    await self.supabase_client.storage.from_("contractor-profile-images").remove(storage_paths)
+                await self.supabase_client.storage.from_("contractor-profile-images").remove(storage_paths)
 
                 # Delete database ALL records
                 await self.supabase_client.table("contractor_profile_images").delete().eq("contractor_profile_id", profile_id).execute()
@@ -173,11 +172,9 @@ class ContractorProfileService:
             if not result.data:
                 raise DatabaseError("Failed to save contractor profile")
 
-            # Handle images if provided with len(image_files) > 0
-            if image_files:
-                # Delete existing images and upload new ones
-                await self._delete_profile_images(profile_id)
-                await self._upload_profile_images_create_records(profile_id, image_files)
+            # Handle images (always)
+            await self._delete_profile_images(profile_id)
+            await self._upload_profile_images_create_records(profile_id, image_files)
 
             # Get the complete profile with images for response
             return await self.get_contractor_profile(clerk_user_id)
