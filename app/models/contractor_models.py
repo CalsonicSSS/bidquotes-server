@@ -12,9 +12,11 @@ class ContractorType(str, Enum):
 class ContractorProfileCreate(BaseModel):
     contractor_name: str
     main_service_areas: str  # Simple text field: "Plumbing, Electrical, HVAC"
-    years_of_experience: int
+    years_of_experience: str
+    phone: str
+    email: str
     contractor_type: ContractorType
-    team_size: int
+    team_size: str
     company_website: Optional[str] = None
     additional_information: Optional[str] = None
 
@@ -22,9 +24,11 @@ class ContractorProfileCreate(BaseModel):
 class ContractorProfileUpdate(BaseModel):
     contractor_name: Optional[str] = None
     main_service_areas: Optional[str] = None
-    years_of_experience: Optional[int] = None
+    years_of_experience: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
     contractor_type: Optional[ContractorType] = None
-    team_size: Optional[int] = None
+    team_size: Optional[str] = None
     company_website: Optional[str] = None
     additional_information: Optional[str] = None
 
@@ -43,9 +47,11 @@ class ContractorProfileResponse(BaseModel):
     user_id: str
     contractor_name: str
     main_service_areas: str
-    years_of_experience: int
+    years_of_experience: str
     contractor_type: ContractorType
-    team_size: int
+    team_size: str
+    phone: str
+    email: str
     company_website: Optional[str] = None
     additional_information: Optional[str] = None
     created_at: datetime

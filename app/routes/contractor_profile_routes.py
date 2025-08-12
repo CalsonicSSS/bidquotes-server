@@ -50,9 +50,11 @@ async def check_contractor_profile_completion(
 async def save_contractor_profile(
     contractor_name: str = Form(...),
     main_service_areas: str = Form(...),  # Simple text field
-    years_of_experience: int = Form(...),
+    years_of_experience: str = Form(...),
     contractor_type: str = Form(...),
-    team_size: int = Form(...),
+    team_size: str = Form(...),
+    phone: str = Form(...),
+    email: str = Form(...),
     company_website: Optional[str] = Form(None),
     additional_information: Optional[str] = Form(None),
     images: List[UploadFile] = File(default=[]),
@@ -71,6 +73,8 @@ async def save_contractor_profile(
         years_of_experience=years_of_experience,
         contractor_type=ContractorType(contractor_type),
         team_size=team_size,
+        phone=phone,
+        email=email,
         company_website=company_website,
         additional_information=additional_information,
     )
@@ -85,9 +89,11 @@ async def save_contractor_profile(
 async def update_contractor_profile(
     contractor_name: Optional[str] = Form(None),
     main_service_areas: Optional[str] = Form(None),  # Simple text field
-    years_of_experience: Optional[int] = Form(None),
+    years_of_experience: Optional[str] = Form(None),
     contractor_type: Optional[str] = Form(None),
-    team_size: Optional[int] = Form(None),
+    team_size: Optional[str] = Form(None),
+    phone: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
     company_website: Optional[str] = Form(None),
     additional_information: Optional[str] = Form(None),
     images: List[UploadFile] = File(default=[]),
@@ -106,6 +112,8 @@ async def update_contractor_profile(
         years_of_experience=years_of_experience,
         contractor_type=ContractorType(contractor_type) if contractor_type else None,
         team_size=team_size,
+        phone=phone,
+        email=email,
         company_website=company_website,
         additional_information=additional_information,
     )
