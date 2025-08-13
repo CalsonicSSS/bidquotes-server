@@ -89,3 +89,44 @@ class BidDetailResponse(BaseModel):
     job_type: str
     job_budget: str
     job_city: str
+
+
+# ------------------------------------------------------
+# buyer side
+
+
+class BuyerBidCardInfo(BaseModel):
+    """Bid information for buyer's job detail view"""
+
+    id: str
+    contractor_id: str
+    title: str
+    price_min: str
+    price_max: str
+    timeline_estimate: str
+    status: str
+    is_selected: bool
+    created_at: datetime
+
+
+class BuyerBidDetailResponse(BaseModel):
+    """Bid detail response for buyer perspective (no contractor contact info)"""
+
+    id: str
+    job_id: str
+    contractor_id: str
+    title: str
+    price_min: str
+    price_max: str
+    timeline_estimate: str
+    work_description: str
+    additional_notes: Optional[str]
+    status: BidStatus
+    is_selected: bool
+    created_at: datetime
+    updated_at: datetime
+    # Job context info for reference
+    job_title: str
+    job_type: str
+    job_budget: str
+    job_city: str

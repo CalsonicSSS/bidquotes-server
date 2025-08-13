@@ -1,4 +1,5 @@
 from supabase import AsyncClient
+from app.models.bid_models import BuyerBidCardInfo, BuyerBidDetailResponse
 from app.models.job_models import (
     JobCreate,
     JobUpdate,
@@ -339,54 +340,112 @@ class JobService:
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
     async def get_job_detail(self, clerk_user_id: str, job_id: str) -> JobDetailViewResponse:
-        """Get complete job details with images and bids for buyer review"""
+        """Get detailed job information including bid details for buyer"""
         try:
             user_id = await self._get_user_id(clerk_user_id)
 
-            # Get job with images
+            # Fetch job with permission check
+            job_result = await self.supabase_client.table("jobs").select("*").eq("id", job_id).eq("buyer_id", user_id).execute()
+            if not job_result.data:
+                raise ValidationError("Job not found or permission denied")
+
+            job_data = job_result.data[0]
+
+            # Fetch job images
+            images_result = await self.supabase_client.table("job_images").select("*").eq("job_id", job_id).order("image_order").execute()
+            job_images = [JobImageResponse(**img) for img in images_result.data] if images_result.data else []
+
+            # Fetch bids (no contractor info exposed)
+            job_bids_result = (
+                await self.supabase_client.table("bids").select("*").eq("job_id", job_id).neq("status", "draft").order("created_at").execute()
+            )
+
+            # Process bid data
+            bid_cards = []
+            if job_bids_result.data:
+                for bid_data in job_bids_result.data:
+                    bid_card = BuyerBidCardInfo(
+                        id=bid_data["id"],
+                        contractor_id=bid_data["contractor_id"],
+                        title=bid_data["title"],
+                        price_min=bid_data["price_min"],
+                        price_max=bid_data["price_max"],
+                        timeline_estimate=bid_data["timeline_estimate"],
+                        status=bid_data["status"],
+                        is_selected=bid_data["is_selected"],
+                        created_at=bid_data["created_at"],
+                    )
+                    bid_cards.append(bid_card)
+
+            # Count current non-draft bids
+            bid_count = len(bid_cards)
+
+            # Create complete job response
+            job_detail_response = JobDetailViewResponse(**job_data, bid_count=bid_count, images=job_images, bids=bid_cards)
+
+            logger.info(f"✅ Job detail fetched with {bid_count} bids for job {job_id}")
+            return job_detail_response
+
+        except Exception as e:
+            logger.error(f"Error fetching job detail - {str(e)}")
+            if isinstance(e, (UserNotFoundError, ValidationError)):
+                raise e
+            raise ServerError(f"Failed to fetch job details")
+
+    # ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    async def get_bid_detail_for_buyer(self, clerk_user_id: str, job_id: str, bid_id: str) -> BuyerBidDetailResponse:
+        """Get bid details for buyer review (no contractor contact info exposed)"""
+        try:
+            user_id = await self._get_user_id(clerk_user_id)
+
+            # First verify buyer owns the job
             job_result = (
                 await self.supabase_client.table("jobs")
-                .select(
-                    """
-                *, job_images(*)
-            """
-                )
+                .select("id, title, job_type, job_budget, city")
                 .eq("id", job_id)
                 .eq("buyer_id", user_id)
                 .execute()
             )
-
             if not job_result.data:
                 raise ValidationError("Job not found or permission denied")
 
-            target_job_data = job_result.data[0]
+            job_data = job_result.data[0]
 
-            # Get bid count
-            bid_result = (
-                await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").neq("status", "declined").execute()
+            # Get bid details with verification that bid belongs to this job
+            bid_result = await self.supabase_client.table("bids").select("*").eq("id", bid_id).eq("job_id", job_id).execute()
+            if not bid_result.data:
+                raise ValidationError("Bid not found for this job")
+
+            bid_data = bid_result.data[0]
+
+            # Create complete bid detail response
+            bid_detail = BuyerBidDetailResponse(
+                id=bid_data["id"],
+                job_id=bid_data["job_id"],
+                contractor_id=bid_data["contractor_id"],
+                title=bid_data["title"],
+                price_min=bid_data["price_min"],
+                price_max=bid_data["price_max"],
+                timeline_estimate=bid_data["timeline_estimate"],
+                work_description=bid_data["work_description"],
+                additional_notes=bid_data["additional_notes"],
+                status=bid_data["status"],
+                is_selected=bid_data["is_selected"],
+                created_at=bid_data["created_at"],
+                updated_at=bid_data["updated_at"],
+                # Job context
+                job_title=job_data["title"],
+                job_type=job_data["job_type"],
+                job_budget=job_data["job_budget"],
+                job_city=job_data["city"],
             )
-            bid_count = len(bid_result.data) if bid_result.data else 0
 
-            # TODO: Get detailed bid information for buyer review
-            # This will be implemented when we create the bid system
-            # For now, just include bid_count
-
-            # Format images
-            images = []
-            if target_job_data.get("job_images"):
-                for img in target_job_data["job_images"]:
-                    images.append(JobImageResponse(**img))
-                images.sort(key=lambda x: x.image_order)
-
-            # Prepare response data
-            response_data = {**target_job_data, "images": images, "bid_count": bid_count}
-            response_data.pop("job_images", None)  # Remove raw job_images field
-
-            logger.info(f"✅ Retrieved job detail: {job_id}")
-            return JobDetailViewResponse(**response_data)
+            logger.info(f"✅ Bid detail fetched for buyer - bid: {bid_id}, job: {job_id}")
+            return bid_detail
 
         except Exception as e:
-            logger.error(f"Error getting job detail - {str(e)}")
+            logger.error(f"Error fetching bid detail for buyer - {str(e)}")
             if isinstance(e, (UserNotFoundError, ValidationError)):
                 raise e
-            raise ServerError(f"Failed to fetch your job detail")
+            raise ServerError(f"Failed to fetch bid details")

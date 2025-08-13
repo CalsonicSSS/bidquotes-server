@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query, File, UploadFile, Form, HTTPException
 from supabase import AsyncClient
+from app.models.bid_models import BuyerBidDetailResponse
 from app.utils.supabase_client_handlers import get_supabase_client
 from app.utils.user_auth import get_current_clerk_user_id
 from app.services.buyer_jobs_services import JobService
@@ -179,3 +180,17 @@ async def get_job_detail(
 ):
     """Get complete job details with images and bid information"""
     return await job_service.get_job_detail(clerk_user_id, job_id)
+
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+
+@buyer_job_router.get("/{job_id}/bids/{bid_id}", response_model=BuyerBidDetailResponse)
+async def get_bid_detail_for_buyer(
+    job_id: str,
+    bid_id: str,
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    job_service: JobService = Depends(get_job_service),
+):
+    """Get bid details for buyer review (no contractor contact info)"""
+    return await job_service.get_bid_detail_for_buyer(clerk_user_id, job_id, bid_id)

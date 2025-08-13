@@ -3,6 +3,8 @@ from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
+from app.models.bid_models import BuyerBidCardInfo
+
 
 class JobType(str, Enum):
     PLUMBING = "Plumbing"
@@ -54,24 +56,8 @@ class JobDraftCreate(BaseModel):
     other_requirements: Optional[str] = None
 
 
-class JobResponse(BaseModel):
-    id: str
-    buyer_id: str
-    title: str
-    job_type: JobType
-    job_budget: str
-    description: str
-    location_address: str
-    city: str
-    other_requirements: Optional[str]
-    status: JobStatus
-    selection_count: int
-    max_selections: int
-    created_at: datetime
-    updated_at: datetime
-
-
 # -------------------------------------------------------------------------------------------
+# buyer side
 
 
 class JobImageCreate(BaseModel):
@@ -91,6 +77,24 @@ class JobImageResponse(BaseModel):
 
 
 # -------------------------------------------------------------------------------------------
+# all job responses
+
+
+class JobResponse(BaseModel):
+    id: str
+    buyer_id: str
+    title: str
+    job_type: JobType
+    job_budget: str
+    description: str
+    location_address: str
+    city: str
+    other_requirements: Optional[str]
+    status: JobStatus
+    selection_count: int
+    max_selections: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class JobDetailViewResponse(BaseModel):
@@ -110,6 +114,7 @@ class JobDetailViewResponse(BaseModel):
     updated_at: datetime
     images: List[JobImageResponse] = []
     bid_count: int = 0
+    bids: Optional[List[BuyerBidCardInfo]] = None  # Add this new field
 
 
 class JobCardResponse(BaseModel):
@@ -121,6 +126,10 @@ class JobCardResponse(BaseModel):
     created_at: datetime
     # Include first image if available
     thumbnail_image: Optional[str] = None
+
+
+# -------------------------------------------------------------------------------
+# contractor side
 
 
 class ContractorJobCardResponse(BaseModel):
