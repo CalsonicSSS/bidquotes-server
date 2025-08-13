@@ -89,6 +89,9 @@ class BidDetailResponse(BaseModel):
     job_type: str
     job_budget: str
     job_city: str
+    # Buyer contact info (only revealed when bid is confirmed)
+    buyer_contact_email: Optional[str] = None
+    buyer_contact_phone: Optional[str] = None
 
 
 # ------------------------------------------------------

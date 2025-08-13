@@ -316,44 +316,184 @@ class BidService:
     # ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
     async def get_bid_detail(self, clerk_user_id: str, bid_id: str) -> BidDetailResponse:
-        """Get complete bid details with job context"""
+        """Get complete bid details with job context and buyer contact info (if confirmed)"""
         try:
-            contractor_id = await self._get_user_id(clerk_user_id)
+            user_id = await self._get_user_id(clerk_user_id)
 
-            # Get bid with job information
-            result = (
+            # Get bid details with job context
+            bid_result = (
                 await self.supabase_client.table("bids")
                 .select(
                     """
-                    *, 
-                    jobs(title, job_type, job_budget, city)
-                """
+                *,
+                jobs!inner(
+                    buyer_id,
+                    title,
+                    job_type,
+                    job_budget,
+                    city
+                )
+            """
                 )
                 .eq("id", bid_id)
-                .eq("contractor_id", contractor_id)
+                .eq("contractor_id", user_id)
                 .execute()
             )
 
-            if not result.data:
+            if not bid_result.data:
                 raise ValidationError("Bid not found or permission denied")
 
-            bid_data = result.data[0]
-            job_info = bid_data.pop("jobs")
+            bid_data = bid_result.data[0]
+            job_data = bid_data["jobs"]
 
-            # Prepare response with job context
-            response_data = {
-                **bid_data,
-                "job_title": job_info["title"],
-                "job_type": job_info["job_type"],
-                "job_budget": job_info["job_budget"],
-                "job_city": job_info["city"],
-            }
+            # Initialize buyer contact info as None
+            buyer_contact_email = None
+            buyer_contact_phone = None
 
-            logger.info(f"✅ Retrieved bid detail: {bid_id}")
-            return BidDetailResponse(**response_data)
+            # Only reveal buyer contact info if bid is confirmed
+            if bid_data["status"] == "confirmed":
+                contact_result = (
+                    await self.supabase_client.table("buyer_profiles")
+                    .select("contact_email, phone_number")
+                    .eq("user_id", job_data["buyer_id"])
+                    .execute()
+                )
+                if contact_result.data:
+                    contact_data = contact_result.data[0]
+                    buyer_contact_email = contact_data["contact_email"]
+                    buyer_contact_phone = contact_data["phone_number"]
+
+            # Create bid detail response
+            bid_detail = BidDetailResponse(
+                id=bid_data["id"],
+                job_id=bid_data["job_id"],
+                contractor_id=bid_data["contractor_id"],
+                title=bid_data["title"],
+                price_min=bid_data["price_min"],
+                price_max=bid_data["price_max"],
+                timeline_estimate=bid_data["timeline_estimate"],
+                work_description=bid_data["work_description"],
+                additional_notes=bid_data["additional_notes"],
+                status=bid_data["status"],
+                is_selected=bid_data["is_selected"],
+                created_at=bid_data["created_at"],
+                updated_at=bid_data["updated_at"],
+                # Job context
+                job_title=job_data["title"],
+                job_type=job_data["job_type"],
+                job_budget=job_data["job_budget"],
+                job_city=job_data["city"],
+                # Buyer contact (only if confirmed)
+                buyer_contact_email=buyer_contact_email,
+                buyer_contact_phone=buyer_contact_phone,
+            )
+
+            logger.info(f"✅ Bid detail retrieved for contractor - bid: {bid_id}")
+            return bid_detail
 
         except Exception as e:
             logger.error(f"Error getting bid detail - {str(e)}")
             if isinstance(e, (UserNotFoundError, ValidationError)):
                 raise e
-            raise ServerError(f"Failed to fetch bid detail")
+            raise ServerError(f"Failed to get bid details")
+
+    # =====================================================================================================
+    # BID DECLINE AND CONFIRM OPERATIONS
+    # =====================================================================================================
+
+    async def decline_selected_bid(self, clerk_user_id: str, bid_id: str) -> bool:
+        """Decline a selected bid and update job status accordingly"""
+        try:
+            user_id = await self._get_user_id(clerk_user_id)
+
+            # Verify contractor owns this bid and it's selected
+            bid_result = await self.supabase_client.table("bids").select("*").eq("id", bid_id).eq("contractor_id", user_id).execute()
+            if not bid_result.data:
+                raise ValidationError("Bid not found or permission denied")
+
+            bid_data = bid_result.data[0]
+
+            # Check if bid is in selected status
+            if bid_data["status"] != "selected" or not bid_data["is_selected"]:
+                raise ValidationError("This bid is not currently selected")
+
+            job_id = bid_data["job_id"]
+
+            # Start transaction-like operations
+            # 1. Update bid status to declined and unselect it
+            await self.supabase_client.table("bids").update({"status": "declined", "is_selected": False}).eq("id", bid_id).execute()
+
+            # 2. Count remaining active bids for the job (excluding declined and draft)
+            remaining_bids_result = (
+                await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").neq("status", "declined").execute()
+            )
+            remaining_bid_count = len(remaining_bids_result.data) if remaining_bids_result.data else 0
+
+            # 3. Update job status back to open (declined bids don't count toward bid limit)
+            new_job_status = "open"  # Always goes back to open since declined bid is removed from count
+
+            await self.supabase_client.table("jobs").update({"status": new_job_status}).eq("id", job_id).execute()
+
+            logger.info(f"✅ Bid declined successfully - bid: {bid_id}, job: {job_id}, remaining bids: {remaining_bid_count}")
+
+            # TODO: Send email notification to buyer (placeholder for now)
+            # await self._send_bid_decline_notification(job_id, bid_id)
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error declining selected bid - {str(e)}")
+            if isinstance(e, (UserNotFoundError, ValidationError)):
+                raise e
+            raise ServerError(f"Failed to decline bid selection")
+
+    # ---------------------------------------------------------------------------------------------------------------------------------------
+
+    async def confirm_selected_bid(self, clerk_user_id: str, bid_id: str) -> bool:
+        """Confirm a selected bid (skip payment for now) and complete the job"""
+        try:
+            user_id = await self._get_user_id(clerk_user_id)
+
+            # Verify contractor owns this bid and it's selected
+            bid_result = await self.supabase_client.table("bids").select("*").eq("id", bid_id).eq("contractor_id", user_id).execute()
+            if not bid_result.data:
+                raise ValidationError("Bid not found or permission denied")
+
+            bid_data = bid_result.data[0]
+
+            # Check if bid is in selected status
+            if bid_data["status"] != "selected" or not bid_data["is_selected"]:
+                raise ValidationError("This bid is not currently selected")
+
+            job_id = bid_data["job_id"]
+
+            # Start transaction-like operations
+            # 1. Update this bid to confirmed status
+            await self.supabase_client.table("bids").update(
+                {
+                    "status": "confirmed"
+                    # Keep is_selected as True since this is the confirmed bid
+                }
+            ).eq("id", bid_id).execute()
+
+            # 2. Update job status to confirmed
+            await self.supabase_client.table("jobs").update({"status": "confirmed"}).eq("id", job_id).execute()
+
+            # 3. Decline all other bids for this job
+            await self.supabase_client.table("bids").update({"status": "declined", "is_selected": False}).eq("job_id", job_id).neq(
+                "id", bid_id
+            ).execute()
+
+            logger.info(f"✅ Bid confirmed successfully - bid: {bid_id}, job: {job_id}")
+
+            # TODO: Send email notifications (placeholder for now)
+            # await self._send_bid_confirmation_notification(job_id, bid_id)
+            # await self._send_declined_bid_notifications(job_id, bid_id)
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error confirming selected bid - {str(e)}")
+            if isinstance(e, (UserNotFoundError, ValidationError)):
+                raise e
+            raise ServerError(f"Failed to confirm bid selection")

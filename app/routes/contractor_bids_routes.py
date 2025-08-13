@@ -146,3 +146,29 @@ async def get_bid_detail(
 ):
     """Get complete bid details with job context"""
     return await bid_service.get_bid_detail(clerk_user_id, bid_id)
+
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+
+@bid_router.post("/{bid_id}/decline", response_model=bool)
+async def decline_selected_bid(
+    bid_id: str,
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    bid_service: BidService = Depends(get_bid_service),
+):
+    """Decline a selected bid"""
+    return await bid_service.decline_selected_bid(clerk_user_id, bid_id)
+
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+
+@bid_router.post("/{bid_id}/confirm", response_model=bool)
+async def confirm_selected_bid(
+    bid_id: str,
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    bid_service: BidService = Depends(get_bid_service),
+):
+    """Confirm a selected bid (skip payment for now)"""
+    return await bid_service.confirm_selected_bid(clerk_user_id, bid_id)

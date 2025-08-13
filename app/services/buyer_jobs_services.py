@@ -305,7 +305,14 @@ class JobService:
             fetched_jobs = []
             for job_data in result.data:
                 # Get bid count
-                bid_result = await self.supabase_client.table("bids").select("id").eq("job_id", job_data["id"]).neq("status", "draft").execute()
+                bid_result = (
+                    await self.supabase_client.table("bids")
+                    .select("id")
+                    .eq("job_id", job_data["id"])
+                    .neq("status", "draft")
+                    .neq("status", "declined")
+                    .execute()
+                )
                 bid_count = len(bid_result.data) if bid_result.data else 0
 
                 # Get thumbnail (first image)
@@ -357,7 +364,13 @@ class JobService:
 
             # Fetch bids (no contractor info exposed)
             job_bids_result = (
-                await self.supabase_client.table("bids").select("*").eq("job_id", job_id).neq("status", "draft").order("created_at").execute()
+                await self.supabase_client.table("bids")
+                .select("*")
+                .eq("job_id", job_id)
+                .neq("status", "draft")
+                .neq("status", "declined")
+                .order("created_at")
+                .execute()
             )
 
             # Process bid data
@@ -393,6 +406,10 @@ class JobService:
             raise ServerError(f"Failed to fetch job details")
 
     # ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    # =====================================================================================================
+    # CORE JOB BID OPERATIONS
+    # =====================================================================================================
 
     async def get_bid_detail_for_buyer(self, clerk_user_id: str, job_id: str, bid_id: str) -> BuyerBidDetailResponse:
         """Get bid details for buyer review (no contractor contact info exposed)"""
@@ -469,11 +486,19 @@ class JobService:
                 raise ValidationError("Cannot select bid for job in current status")
 
             # Check selection limit (max 3 selections per job)
-            if job_data["selection_count"] >= job_data["max_selections"]:
+            if job_data["selection_count"] > job_data["max_selections"]:
                 raise ValidationError("Maximum number of bid selections reached for this job")
 
             # Verify bid exists and belongs to this job
-            bid_result = await self.supabase_client.table("bids").select("*").eq("id", bid_id).eq("job_id", job_id).neq("status", "draft").execute()
+            bid_result = (
+                await self.supabase_client.table("bids")
+                .select("*")
+                .eq("id", bid_id)
+                .eq("job_id", job_id)
+                .neq("status", "draft")
+                .neq("status", "declined")
+                .execute()
+            )
             if not bid_result.data:
                 raise ValidationError("Bid not found for this job")
 
@@ -539,7 +564,9 @@ class JobService:
             await self.supabase_client.table("bids").update({"is_selected": False, "status": "pending"}).eq("id", selected_bid["id"]).execute()
 
             # 2. Determine new job status based on bid count
-            bid_count_result = await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").execute()
+            bid_count_result = (
+                await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").neq("status", "declined").execute()
+            )
             current_bid_count = len(bid_count_result.data) if bid_count_result.data else 0
 
             new_job_status = "full_bid" if current_bid_count >= 5 else "open"

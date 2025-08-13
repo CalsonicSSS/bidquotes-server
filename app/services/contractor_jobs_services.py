@@ -62,7 +62,14 @@ class ContractorJobService:
             available_jobs = []
             for job_data in result.data:
                 # Get bid count for this job (non-draft bids only)
-                bid_result = await self.supabase_client.table("bids").select("id").eq("job_id", job_data["id"]).neq("status", "draft").execute()
+                bid_result = (
+                    await self.supabase_client.table("bids")
+                    .select("id")
+                    .eq("job_id", job_data["id"])
+                    .neq("status", "draft")
+                    .neq("status", "declined")
+                    .execute()
+                )
                 bid_count = len(bid_result.data) if bid_result.data else 0
 
                 # Only include jobs with less than 5 bids (not full)
@@ -131,7 +138,7 @@ class ContractorJobService:
                 """
                 )
                 .eq("id", job_id)
-                .eq("status", "open")  # Only allow viewing open jobs
+                # .eq("status", "open")  # Only allow viewing open jobs
                 .neq("buyer_id", user_id)  # Don't allow viewing own jobs if contractor is also buyer
                 .execute()
             )
