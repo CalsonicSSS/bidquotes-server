@@ -170,6 +170,7 @@ async def get_buyer_jobs(
 
 
 # ------------------------------------------------------------------------------------------------------------------------
+# this will include all the current bids
 
 
 @buyer_job_router.get("/{job_id}", response_model=JobDetailViewResponse)
@@ -183,6 +184,7 @@ async def get_job_detail(
 
 
 # ------------------------------------------------------------------------------------------------------------------------
+# get specific bid detail submitted for this job
 
 
 @buyer_job_router.get("/{job_id}/bids/{bid_id}", response_model=BuyerBidDetailResponse)
@@ -194,3 +196,30 @@ async def get_bid_detail_for_buyer(
 ):
     """Get bid details for buyer review (no contractor contact info)"""
     return await job_service.get_bid_detail_for_buyer(clerk_user_id, job_id, bid_id)
+
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+
+@buyer_job_router.post("/{job_id}/bids/{bid_id}/select", response_model=bool)
+async def select_bid(
+    job_id: str,
+    bid_id: str,
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    job_service: JobService = Depends(get_job_service),
+):
+    """Select a bid for a job"""
+    return await job_service.select_bid(clerk_user_id, job_id, bid_id)
+
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+
+@buyer_job_router.delete("/{job_id}/selection", response_model=bool)
+async def cancel_bid_selection(
+    job_id: str,
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    job_service: JobService = Depends(get_job_service),
+):
+    """Cancel current bid selection for a job"""
+    return await job_service.cancel_bid_selection(clerk_user_id, job_id)
