@@ -5,7 +5,7 @@ from app.models.contractor_models import (  # Assuming you add the contractor mo
     ContractorProfileResponse,
     ContractorProfileImageResponse,
 )
-from app.custom_error import UserNotFoundError, DatabaseError, ServerError
+from app.custom_error import UserNotFoundError, DatabaseError, ServerError, ValidationError
 from typing import Optional, List, Tuple
 import logging
 import uuid
@@ -111,7 +111,7 @@ class ContractorProfileService:
     # CORE OPERATIONS
     # =====================================================================================================
 
-    async def get_contractor_profile(self, clerk_user_id: str) -> Optional[ContractorProfileResponse]:
+    async def get_contractor_profile(self, clerk_user_id: str) -> ContractorProfileResponse:
         """Get contractor profile information with images"""
         try:
             user_id = await self._get_user_id(clerk_user_id)
@@ -122,7 +122,7 @@ class ContractorProfileService:
             )
 
             if not result.data:
-                return None
+                raise ValidationError("Contractor profile not found")
 
             profile_data = result.data[0].copy()
 
@@ -137,6 +137,29 @@ class ContractorProfileService:
             profile_data.pop("contractor_profile_images", None)
 
             return ContractorProfileResponse(**profile_data)
+
+        except Exception as e:
+            logger.error(f"Error in get_contractor_profile: {str(e)}")
+            if isinstance(e, UserNotFoundError):
+                raise e
+            raise ServerError(f"Server operation failed: {str(e)}")
+
+    # ------------------------------------------------------------------------------------------------------------------------------
+
+    async def get_contractor_profile_name(self, clerk_user_id: str) -> str:
+        """Get contractor profile information with images"""
+        try:
+            user_id = await self._get_user_id(clerk_user_id)
+
+            # Always get profile with images
+            result = await self.supabase_client.table("contractor_profiles").select("contractor_name").eq("user_id", user_id).execute()
+
+            if not result.data:
+                raise ValidationError("Contractor profile not found")
+
+            profile_data = result.data[0]
+
+            return profile_data["contractor_name"]
 
         except Exception as e:
             logger.error(f"Error in get_contractor_profile: {str(e)}")

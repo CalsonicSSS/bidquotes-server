@@ -30,12 +30,20 @@ async def process_uploaded_profile_files(uploaded_images: List[UploadFile]) -> L
 #############################################################################################################################################
 
 
-@contractor_profile_router.get("/profile", response_model=Optional[ContractorProfileResponse])
+@contractor_profile_router.get("/profile", response_model=ContractorProfileResponse)
 async def get_contractor_profile(
     clerk_user_id: str = Depends(get_current_clerk_user_id), contractor_service: ContractorProfileService = Depends(get_contractor_profile_service)
 ):
     """Get contractor profile information with images"""
     return await contractor_service.get_contractor_profile(clerk_user_id)
+
+
+@contractor_profile_router.get("/profile/name", response_model=str)
+async def get_contractor_profile_name(
+    clerk_user_id: str = Depends(get_current_clerk_user_id), contractor_service: ContractorProfileService = Depends(get_contractor_profile_service)
+):
+    """Get contractor profile information with images"""
+    return await contractor_service.get_contractor_profile_name(clerk_user_id)
 
 
 @contractor_profile_router.get("/profile/completion-status", response_model=bool)
