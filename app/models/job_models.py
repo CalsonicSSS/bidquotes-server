@@ -21,6 +21,7 @@ class JobType(str, Enum):
 class JobStatus(str, Enum):
     DRAFT = "draft"
     OPEN = "open"
+    CLOSED = "closed"
     FULL_BID = "full_bid"
     WAITING_CONFIRMATION = "waiting_confirmation"
     CONFIRMED = "confirmed"

@@ -209,7 +209,7 @@ class JobService:
                 raise ValidationError("Job not found or permission denied")
 
             current_status = job_result.data[0]["status"]
-            if current_status not in [JobStatus.DRAFT.value, JobStatus.OPEN.value, JobStatus.FULL_BID.value]:
+            if current_status not in [JobStatus.DRAFT.value, JobStatus.OPEN.value]:
                 raise ValidationError("Cannot edit job in current status")
 
             # Update job data if provided
@@ -254,7 +254,7 @@ class JobService:
                 raise ValidationError("Job not found or permission denied")
 
             current_status = job_result.data[0]["status"]
-            if current_status not in [JobStatus.DRAFT.value, JobStatus.OPEN.value, JobStatus.FULL_BID.value]:
+            if current_status not in [JobStatus.DRAFT.value]:
                 raise ValidationError("Cannot delete job in current status")
 
             # Delete associated images from storage and records
@@ -274,6 +274,35 @@ class JobService:
             if isinstance(e, (UserNotFoundError, DatabaseError, ValidationError)):
                 raise e
             raise ServerError(f"Failed to delete your job")
+
+    # close job logics
+    async def close_job(self, clerk_user_id: str, job_id: str) -> bool:
+        """Close job by updating specific job status to closed"""
+        try:
+            user_id = await self._get_user_id(clerk_user_id)
+
+            # Verify permissions and status
+            job_result = await self.supabase_client.table("jobs").select("status").eq("id", job_id).eq("buyer_id", user_id).execute()
+            if not job_result.data:
+                raise ValidationError("Job not found or permission denied")
+
+            current_status = job_result.data[0]["status"]
+            if current_status != JobStatus.OPEN.value:
+                raise ValidationError("Cannot close job in current status")
+
+            # Update job status to closed
+            result = await self.supabase_client.table("jobs").update({"status": JobStatus.CLOSED.value}).eq("id", job_id).execute()
+            if not result.data:
+                raise DatabaseError("Failed to close your job")
+
+            logger.info(f"✅ Job closed successfully: {job_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error closing job: {str(e)}")
+            if isinstance(e, (UserNotFoundError, DatabaseError, ValidationError)):
+                raise e
+            raise ServerError(f"Failed to close your job")
 
     # =====================================================================================================
     # JOB READING OPERATIONS
@@ -346,7 +375,7 @@ class JobService:
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
-    async def get_job_detail(self, clerk_user_id: str, job_id: str) -> JobDetailViewResponse:
+    async def get_target_job(self, clerk_user_id: str, job_id: str) -> JobDetailViewResponse:
         """Get detailed job information including bid details for buyer"""
         try:
             user_id = await self._get_user_id(clerk_user_id)
@@ -411,7 +440,7 @@ class JobService:
     # CORE JOB BID OPERATIONS
     # =====================================================================================================
 
-    async def get_bid_detail_for_buyer(self, clerk_user_id: str, job_id: str, bid_id: str) -> BuyerBidDetailResponse:
+    async def get_target_bid_for_target_job(self, clerk_user_id: str, job_id: str, bid_id: str) -> BuyerBidDetailResponse:
         """Get bid details for buyer review (no contractor contact info exposed)"""
         try:
             user_id = await self._get_user_id(clerk_user_id)
@@ -469,120 +498,120 @@ class JobService:
 
     # ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    async def select_bid(self, clerk_user_id: str, job_id: str, bid_id: str) -> bool:
-        """Select a bid for a job (max 3 selections allowed per job)"""
-        try:
-            user_id = await self._get_user_id(clerk_user_id)
+    # async def select_bid(self, clerk_user_id: str, job_id: str, bid_id: str) -> bool:
+    #     """Select a bid for a job (max 3 selections allowed per job)"""
+    #     try:
+    #         user_id = await self._get_user_id(clerk_user_id)
 
-            # Verify buyer owns the job and get job details
-            job_result = await self.supabase_client.table("jobs").select("*").eq("id", job_id).eq("buyer_id", user_id).execute()
-            if not job_result.data:
-                raise ValidationError("Job not found or permission denied")
+    #         # Verify buyer owns the job and get job details
+    #         job_result = await self.supabase_client.table("jobs").select("*").eq("id", job_id).eq("buyer_id", user_id).execute()
+    #         if not job_result.data:
+    #             raise ValidationError("Job not found or permission denied")
 
-            job_data = job_result.data[0]
+    #         job_data = job_result.data[0]
 
-            # Check if job is in valid status for selection
-            if job_data["status"] not in ["open", "full_bid"]:
-                raise ValidationError("Cannot select bid for job in current status")
+    #         # Check if job is in valid status for selection
+    #         if job_data["status"] not in ["open", "full_bid"]:
+    #             raise ValidationError("Cannot select bid for job in current status")
 
-            # Check selection limit (max 3 selections per job)
-            if job_data["selection_count"] > job_data["max_selections"]:
-                raise ValidationError("Maximum number of bid selections reached for this job")
+    #         # Check selection limit (max 3 selections per job)
+    #         if job_data["selection_count"] > job_data["max_selections"]:
+    #             raise ValidationError("Maximum number of bid selections reached for this job")
 
-            # Verify bid exists and belongs to this job
-            bid_result = (
-                await self.supabase_client.table("bids")
-                .select("*")
-                .eq("id", bid_id)
-                .eq("job_id", job_id)
-                .neq("status", "draft")
-                .neq("status", "declined")
-                .execute()
-            )
-            if not bid_result.data:
-                raise ValidationError("Bid not found for this job")
+    #         # Verify bid exists and belongs to this job
+    #         bid_result = (
+    #             await self.supabase_client.table("bids")
+    #             .select("*")
+    #             .eq("id", bid_id)
+    #             .eq("job_id", job_id)
+    #             .neq("status", "draft")
+    #             .neq("status", "declined")
+    #             .execute()
+    #         )
+    #         if not bid_result.data:
+    #             raise ValidationError("Bid not found for this job")
 
-            bid_data = bid_result.data[0]
+    #         bid_data = bid_result.data[0]
 
-            # Check if bid is already selected
-            if bid_data["is_selected"]:
-                raise ValidationError("This bid is already selected")
+    #         # Check if bid is already selected
+    #         if bid_data["is_selected"]:
+    #             raise ValidationError("This bid is already selected")
 
-            # Start transaction-like operations
-            # 1. Unselect any currently selected bid for this job
-            await self.supabase_client.table("bids").update({"is_selected": False}).eq("job_id", job_id).eq("is_selected", True).execute()
+    #         # Start transaction-like operations
+    #         # 1. Unselect any currently selected bid for this job
+    #         await self.supabase_client.table("bids").update({"is_selected": False}).eq("job_id", job_id).eq("is_selected", True).execute()
 
-            # 2. Select the new bid
-            await self.supabase_client.table("bids").update({"is_selected": True, "status": "selected"}).eq("id", bid_id).execute()
+    #         # 2. Select the new bid
+    #         await self.supabase_client.table("bids").update({"is_selected": True, "status": "selected"}).eq("id", bid_id).execute()
 
-            # 3. Update job status and increment selection count
-            new_selection_count = job_data["selection_count"] + 1
-            await self.supabase_client.table("jobs").update({"status": "waiting_confirmation", "selection_count": new_selection_count}).eq(
-                "id", job_id
-            ).execute()
+    #         # 3. Update job status and increment selection count
+    #         new_selection_count = job_data["selection_count"] + 1
+    #         await self.supabase_client.table("jobs").update({"status": "waiting_confirmation", "selection_count": new_selection_count}).eq(
+    #             "id", job_id
+    #         ).execute()
 
-            logger.info(f"✅ Bid selected successfully - job: {job_id}, bid: {bid_id}, selection count: {new_selection_count}")
+    #         logger.info(f"✅ Bid selected successfully - job: {job_id}, bid: {bid_id}, selection count: {new_selection_count}")
 
-            # TODO: Send email notification to contractor (placeholder for now)
-            # await self._send_bid_selection_notification(bid_data["contractor_id"], job_id, bid_id)
+    #         # TODO: Send email notification to contractor (placeholder for now)
+    #         # await self._send_bid_selection_notification(bid_data["contractor_id"], job_id, bid_id)
 
-            return True
+    #         return True
 
-        except Exception as e:
-            logger.error(f"Error selecting bid - {str(e)}")
-            if isinstance(e, (UserNotFoundError, ValidationError)):
-                raise e
-            raise ServerError(f"Failed to select bid")
+    #     except Exception as e:
+    #         logger.error(f"Error selecting bid - {str(e)}")
+    #         if isinstance(e, (UserNotFoundError, ValidationError)):
+    #             raise e
+    #         raise ServerError(f"Failed to select bid")
 
-    # -----------------------------------------------------------------------------------------------------------------------
+    # # -----------------------------------------------------------------------------------------------------------------------
 
-    async def cancel_bid_selection(self, clerk_user_id: str, job_id: str) -> bool:
-        """Cancel current bid selection for a job"""
-        try:
-            user_id = await self._get_user_id(clerk_user_id)
+    # async def cancel_bid_selection(self, clerk_user_id: str, job_id: str) -> bool:
+    #     """Cancel current bid selection for a job"""
+    #     try:
+    #         user_id = await self._get_user_id(clerk_user_id)
 
-            # Verify buyer owns the job and get job details
-            job_result = await self.supabase_client.table("jobs").select("*").eq("id", job_id).eq("buyer_id", user_id).execute()
-            if not job_result.data:
-                raise ValidationError("Job not found or permission denied")
+    #         # Verify buyer owns the job and get job details
+    #         job_result = await self.supabase_client.table("jobs").select("*").eq("id", job_id).eq("buyer_id", user_id).execute()
+    #         if not job_result.data:
+    #             raise ValidationError("Job not found or permission denied")
 
-            job_data = job_result.data[0]
+    #         job_data = job_result.data[0]
 
-            # Check if job is in valid status for cancellation
-            if job_data["status"] != "waiting_confirmation":
-                raise ValidationError("No bid selection to cancel for this job")
+    #         # Check if job is in valid status for cancellation
+    #         if job_data["status"] != "waiting_confirmation":
+    #             raise ValidationError("No bid selection to cancel for this job")
 
-            # Find the currently selected bid
-            selected_bid_result = await self.supabase_client.table("bids").select("*").eq("job_id", job_id).eq("is_selected", True).execute()
-            if not selected_bid_result.data:
-                raise ValidationError("No selected bid found for this job")
+    #         # Find the currently selected bid
+    #         selected_bid_result = await self.supabase_client.table("bids").select("*").eq("job_id", job_id).eq("is_selected", True).execute()
+    #         if not selected_bid_result.data:
+    #             raise ValidationError("No selected bid found for this job")
 
-            selected_bid = selected_bid_result.data[0]
+    #         selected_bid = selected_bid_result.data[0]
 
-            # Start transaction-like operations
-            # 1. Unselect the bid and reset its status to pending
-            await self.supabase_client.table("bids").update({"is_selected": False, "status": "pending"}).eq("id", selected_bid["id"]).execute()
+    #         # Start transaction-like operations
+    #         # 1. Unselect the bid and reset its status to pending
+    #         await self.supabase_client.table("bids").update({"is_selected": False, "status": "pending"}).eq("id", selected_bid["id"]).execute()
 
-            # 2. Determine new job status based on bid count
-            bid_count_result = (
-                await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").neq("status", "declined").execute()
-            )
-            current_bid_count = len(bid_count_result.data) if bid_count_result.data else 0
+    #         # 2. Determine new job status based on bid count
+    #         bid_count_result = (
+    #             await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").neq("status", "declined").execute()
+    #         )
+    #         current_bid_count = len(bid_count_result.data) if bid_count_result.data else 0
 
-            new_job_status = "full_bid" if current_bid_count >= 5 else "open"
+    #         new_job_status = "full_bid" if current_bid_count >= 5 else "open"
 
-            # 3. Update job status (selection_count stays the same as it tracks total selections made)
-            await self.supabase_client.table("jobs").update({"status": new_job_status}).eq("id", job_id).execute()
+    #         # 3. Update job status (selection_count stays the same as it tracks total selections made)
+    #         await self.supabase_client.table("jobs").update({"status": new_job_status}).eq("id", job_id).execute()
 
-            logger.info(f"✅ Bid selection cancelled - job: {job_id}, bid: {selected_bid['id']}, new job status: {new_job_status}")
+    #         logger.info(f"✅ Bid selection cancelled - job: {job_id}, bid: {selected_bid['id']}, new job status: {new_job_status}")
 
-            # TODO: Send email notification to contractor (placeholder for now)
-            # await self._send_bid_cancellation_notification(selected_bid["contractor_id"], job_id, selected_bid["id"])
+    #         # TODO: Send email notification to contractor (placeholder for now)
+    #         # await self._send_bid_cancellation_notification(selected_bid["contractor_id"], job_id, selected_bid["id"])
 
-            return True
+    #         return True
 
-        except Exception as e:
-            logger.error(f"Error cancelling bid selection - {str(e)}")
-            if isinstance(e, (UserNotFoundError, ValidationError)):
-                raise e
-            raise ServerError(f"Failed to cancel bid selection")
+    #     except Exception as e:
+    #         logger.error(f"Error cancelling bid selection - {str(e)}")
+    #         if isinstance(e, (UserNotFoundError, ValidationError)):
+    #             raise e
+    #         raise ServerError(f"Failed to cancel bid selection")

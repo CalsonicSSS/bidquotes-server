@@ -16,6 +16,9 @@ async def get_contractor_job_service(supabase_client: AsyncClient = Depends(get_
     return ContractorJobService(supabase_client)
 
 
+# ################################################################################################################################################
+
+
 @contractor_jobs_router.get("/available-jobs", response_model=List[ContractorJobCardResponse])
 async def get_available_jobs_for_contractor(
     city: Optional[str] = Query(None, description="Filter jobs by city"),
@@ -27,12 +30,18 @@ async def get_available_jobs_for_contractor(
     return await contractor_job_service.get_available_jobs(clerk_user_id, city, job_type)
 
 
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+
+
 @contractor_jobs_router.get("/job-cities", response_model=List[str])
 async def get_job_cities(
     contractor_job_service: ContractorJobService = Depends(get_contractor_job_service),
 ):
     """Get unique cities from open jobs for filtering"""
     return await contractor_job_service.get_job_cities()
+
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 @contractor_jobs_router.get("/jobs/{job_id}", response_model=JobDetailViewResponse)

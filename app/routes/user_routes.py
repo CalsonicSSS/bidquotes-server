@@ -31,3 +31,13 @@ async def save_buyer_contact_info(
 async def get_buyer_contact_info(clerk_user_id: str = Depends(get_current_clerk_user_id), user_service: UserService = Depends(get_user_service)):
     """Get buyer contact information"""
     return await user_service.get_buyer_contact_info(clerk_user_id)
+
+
+# get buyer contact information by buyer ID
+@user_router.get("/buyer-contact-info/{buyer_id}", response_model=Optional[BuyerContactInfoResponse])
+async def get_buyer_contact_info_by_id(
+    buyer_id: str,
+    user_service: UserService = Depends(get_user_service),
+):
+    """Get buyer contact information by buyer ID"""
+    return await user_service.get_buyer_contact_info_by_id(buyer_id)

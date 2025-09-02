@@ -4,6 +4,8 @@ from app.custom_error import UserNotFoundError, DatabaseError, ServerError, Vali
 from typing import List, Optional
 import logging
 
+from app.models.job_models import JobStatus
+
 logger = logging.getLogger(__name__)
 
 
@@ -127,6 +129,16 @@ class BidService:
 
             bid = BidResponse(**result.data[0])
 
+            # Perform Stripe payment flow (we will do this later)
+
+            # Once this bid is fully submitted + payment processed, we need to check if it this is the full bid as this is the 5th one for this job
+            # if it is, we will need to update the job status to CLOSED (VERY IMPORTANT)
+            job_bids = (
+                await self.supabase_client.table("bids").select("id").eq("job_id", bid_data.job_id).eq("status", BidStatus.PENDING.value).execute()
+            )
+            if len(job_bids.data) == 5:
+                await self.supabase_client.table("jobs").update({"status": JobStatus.CLOSED.value}).eq("id", bid_data.job_id).execute()
+
             logger.info(f"✅ Bid created successfully: {bid.id}")
             return bid
 
@@ -210,6 +222,20 @@ class BidService:
                 # await self._validate_no_existing_bid(current_bid["job_id"], contractor_id)
 
                 update_data["status"] = BidStatus.PENDING.value
+
+                # Perform Stripe payment flow (we will do this later)
+
+                # Once this bid is fully submitted + payment processed, we need to check if it this is the full bid as this is the 5th one for this job
+                # if it is, we will need to update the job status to CLOSED (VERY IMPORTANT)
+                job_bids = (
+                    await self.supabase_client.table("bids")
+                    .select("*")
+                    .eq("job_id", current_bid["job_id"])
+                    .eq("status", BidStatus.PENDING.value)
+                    .execute()
+                )
+                if len(job_bids.data) >= 5:
+                    await self.supabase_client.table("jobs").update({"status": JobStatus.CLOSED.value}).eq("id", current_bid["job_id"]).execute()
 
             # Update bid
             result = await self.supabase_client.table("bids").update(update_data).eq("id", bid_id).execute()

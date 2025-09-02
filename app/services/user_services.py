@@ -86,3 +86,23 @@ class UserService:
             if isinstance(e, (UserNotFoundError, ContactInfoNotFoundError, DatabaseError)):
                 raise e
             raise ServerError(f"Server operation failed: {str(e)}")
+
+    # --------------------------------------------------------------------------------------------------------------------------
+
+    async def get_buyer_contact_info_by_id(self, buyer_id: str) -> Optional[BuyerContactInfoResponse]:
+        """Get buyer contact information by buyer ID"""
+        try:
+
+            # Get contact info
+            result = await self.supabase_client.table("buyer_profiles").select("*").eq("user_id", buyer_id).execute()
+
+            if not result.data:
+                return None
+
+            return BuyerContactInfoResponse(**result.data[0])
+
+        except Exception as e:
+            logger.error(f"Error in get_buyer_contact_info_by_id: {str(e)}")
+            if isinstance(e, (UserNotFoundError, ContactInfoNotFoundError, DatabaseError)):
+                raise e
+            raise ServerError(f"Server operation failed: {str(e)}")

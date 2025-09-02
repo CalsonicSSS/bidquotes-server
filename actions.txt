@@ -8,11 +8,17 @@
     - Activate the virtual environment (specific to Windows).
     - Once activated, Python and pip commands will use the versions and packages from inside the venv directory, not the global ones.
 
-- "pip install -r requirements.txt" 
-    - install all the dependencies listed in the requirements.txt file.
+- "pip install package1 package2"
+
 
 - "pip freeze > requirements.txt" 
     - The requirements.txt file doesn't automatically update when you install new packages. You need to explicitly update it
+
+
+- "pip install -r requirements.txt" 
+    - install all the dependencies listed in the requirements.txt file.
+
+#############################################################################################################################    
 
 - "uvicorn app.main:app --reload" 
     - to start the fastapi process 

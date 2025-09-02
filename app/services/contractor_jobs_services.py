@@ -138,7 +138,7 @@ class ContractorJobService:
                 """
                 )
                 .eq("id", job_id)
-                # .eq("status", "open")  # Only allow viewing open jobs
+                .eq("status", "open")  # Only allow viewing open jobs
                 .neq("buyer_id", user_id)  # Don't allow viewing own jobs if contractor is also buyer
                 .execute()
             )

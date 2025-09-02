@@ -144,6 +144,40 @@ class ContractorProfileService:
                 raise e
             raise ServerError(f"Server operation failed: {str(e)}")
 
+    # no clerk id needed here
+    async def get_contractor_profile_by_contractor_id(self, contractor_id: str) -> ContractorProfileResponse:
+        """Get contractor profile information by contractor user ID"""
+        try:
+            result = (
+                await self.supabase_client.table("contractor_profiles")
+                .select("*, contractor_profile_images(*)")
+                .eq("user_id", contractor_id)
+                .execute()
+            )
+
+            if not result.data:
+                raise ValidationError("Contractor profile not found")
+
+            profile_data = result.data[0].copy()
+
+            # Format images
+            images = []
+            if profile_data.get("contractor_profile_images"):
+                for img in profile_data["contractor_profile_images"]:
+                    images.append(ContractorProfileImageResponse(**img))
+                images.sort(key=lambda x: x.image_order)
+
+            profile_data["images"] = images
+            profile_data.pop("contractor_profile_images", None)
+
+            return ContractorProfileResponse(**profile_data)
+
+        except Exception as e:
+            logger.error(f"Error in get_contractor_profile_by_id: {str(e)}")
+            if isinstance(e, UserNotFoundError):
+                raise e
+            raise ServerError(f"Server operation failed: {str(e)}")
+
     # ------------------------------------------------------------------------------------------------------------------------------
 
     async def get_contractor_profile_name(self, clerk_user_id: str) -> str:

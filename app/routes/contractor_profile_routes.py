@@ -18,11 +18,11 @@ async def process_uploaded_profile_files(uploaded_images: List[UploadFile]) -> L
     """Helper to convert UploadFile objects to (bytes, filename) tuples"""
     processed_image_files = []
     if uploaded_images and uploaded_images[0].filename:
-        for upload_image in uploaded_images:
-            if upload_image.filename and upload_image.size:
-                content = await upload_image.read()
-                filename = upload_image.filename
-                processed_image_files.append((content, filename))
+        for uploaded_image in uploaded_images:
+            if uploaded_image.filename and uploaded_image.size:
+                file_content = await uploaded_image.read()
+                filename = uploaded_image.filename
+                processed_image_files.append((file_content, filename))
 
     return processed_image_files
 
@@ -38,6 +38,16 @@ async def get_contractor_profile(
     return await contractor_service.get_contractor_profile(clerk_user_id)
 
 
+# get contractor profile by contractor id
+@contractor_profile_router.get("/profile/contractor-id/{contractor_id}", response_model=ContractorProfileResponse)
+async def get_contractor_profile_by_id(
+    contractor_id: str,
+    contractor_service: ContractorProfileService = Depends(get_contractor_profile_service),
+):
+    """Get contractor profile information by contractor ID"""
+    return await contractor_service.get_contractor_profile_by_contractor_id(contractor_id)
+
+
 @contractor_profile_router.get("/profile/name", response_model=str)
 async def get_contractor_profile_name(
     clerk_user_id: str = Depends(get_current_clerk_user_id), contractor_service: ContractorProfileService = Depends(get_contractor_profile_service)
@@ -46,12 +56,18 @@ async def get_contractor_profile_name(
     return await contractor_service.get_contractor_profile_name(clerk_user_id)
 
 
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
 @contractor_profile_router.get("/profile/completion-status", response_model=bool)
 async def check_contractor_profile_completion(
     clerk_user_id: str = Depends(get_current_clerk_user_id), contractor_service: ContractorProfileService = Depends(get_contractor_profile_service)
 ):
     """Check if contractor profile is complete"""
     return await contractor_service.is_contractor_profile_complete(clerk_user_id)
+
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 @contractor_profile_router.post("/profile", response_model=ContractorProfileResponse)

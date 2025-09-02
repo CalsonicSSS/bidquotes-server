@@ -19,11 +19,11 @@ async def process_uploaded_files(uploaded_images: List[UploadFile]) -> List[Tupl
     """Helper to convert UploadFile objects to its (bytes, filename) tuples in list"""
     processed_image_files = []
     if uploaded_images and uploaded_images[0].filename:
-        for upload_image in uploaded_images:
-            if upload_image.filename and upload_image.size:
-                content = await upload_image.read()
-                filename = upload_image.filename
-                processed_image_files.append((content, filename))
+        for uploaded_image in uploaded_images:
+            if uploaded_image.filename and uploaded_image.size:
+                file_content = await uploaded_image.read()
+                filename = uploaded_image.filename
+                processed_image_files.append((file_content, filename))
 
     return processed_image_files
 
@@ -156,11 +156,24 @@ async def delete_job(
     return await job_service.delete_job(clerk_user_id, job_id)
 
 
+# this is for close job by updating specific job status to close
+@buyer_job_router.put("/{job_id}/close", response_model=bool)
+async def close_job(
+    job_id: str,
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    job_service: JobService = Depends(get_job_service),
+):
+    """Close job by updating specific job status to closed"""
+    return await job_service.close_job(clerk_user_id, job_id)
+
+
 # ------------------------------------------------------------------------------------------------------------------------
+# fetch logics
 
 
+# fetch specific buyer all jobs
 @buyer_job_router.get("", response_model=List[JobCardResponse])
-async def get_buyer_jobs(
+async def get_buyer_job_cards(
     status: Optional[str] = Query(None, description="Filter jobs by status (draft, open, full_bid, etc.)"),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     job_service: JobService = Depends(get_job_service),
@@ -169,57 +182,50 @@ async def get_buyer_jobs(
     return await job_service.get_buyer_job_cards(clerk_user_id, status)
 
 
-# ------------------------------------------------------------------------------------------------------------------------
-# this will include all the current bids
-
-
+# fetch specific job for a buyer (include bid counts and bid card detail)
 @buyer_job_router.get("/{job_id}", response_model=JobDetailViewResponse)
-async def get_job_detail(
+async def get_target_job(
     job_id: str,
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     job_service: JobService = Depends(get_job_service),
 ):
     """Get complete job details with images and bid information"""
-    return await job_service.get_job_detail(clerk_user_id, job_id)
+    return await job_service.get_target_job(clerk_user_id, job_id)
 
 
-# ------------------------------------------------------------------------------------------------------------------------
 # get specific bid detail submitted for this job
-
-
 @buyer_job_router.get("/{job_id}/bids/{bid_id}", response_model=BuyerBidDetailResponse)
-async def get_bid_detail_for_buyer(
+async def get_target_bid_for_target_job(
     job_id: str,
     bid_id: str,
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     job_service: JobService = Depends(get_job_service),
 ):
-    """Get bid details for buyer review (no contractor contact info)"""
-    return await job_service.get_bid_detail_for_buyer(clerk_user_id, job_id, bid_id)
+    """Get bid details for buyer review"""
+    return await job_service.get_target_bid_for_target_job(clerk_user_id, job_id, bid_id)
 
 
 # ------------------------------------------------------------------------------------------------------------------------
 
-
-@buyer_job_router.post("/{job_id}/bids/{bid_id}/select", response_model=bool)
-async def select_bid(
-    job_id: str,
-    bid_id: str,
-    clerk_user_id: str = Depends(get_current_clerk_user_id),
-    job_service: JobService = Depends(get_job_service),
-):
-    """Select a bid for a job"""
-    return await job_service.select_bid(clerk_user_id, job_id, bid_id)
-
-
-# ------------------------------------------------------------------------------------------------------------------------
+# @buyer_job_router.post("/{job_id}/bids/{bid_id}/select", response_model=bool)
+# async def select_bid(
+#     job_id: str,
+#     bid_id: str,
+#     clerk_user_id: str = Depends(get_current_clerk_user_id),
+#     job_service: JobService = Depends(get_job_service),
+# ):
+#     """Select a bid for a job"""
+#     return await job_service.select_bid(clerk_user_id, job_id, bid_id)
 
 
-@buyer_job_router.delete("/{job_id}/selection", response_model=bool)
-async def cancel_bid_selection(
-    job_id: str,
-    clerk_user_id: str = Depends(get_current_clerk_user_id),
-    job_service: JobService = Depends(get_job_service),
-):
-    """Cancel current bid selection for a job"""
-    return await job_service.cancel_bid_selection(clerk_user_id, job_id)
+# # ------------------------------------------------------------------------------------------------------------------------
+
+
+# @buyer_job_router.delete("/{job_id}/selection", response_model=bool)
+# async def cancel_bid_selection(
+#     job_id: str,
+#     clerk_user_id: str = Depends(get_current_clerk_user_id),
+#     job_service: JobService = Depends(get_job_service),
+# ):
+#     """Cancel current bid selection for a job"""
+#     return await job_service.cancel_bid_selection(clerk_user_id, job_id)
