@@ -116,7 +116,9 @@ class BidService:
             # Validate bid data
             self._validate_bid_data(bid_data.price_min, bid_data.price_max)
 
-            # Prepare bid record
+            # Perform Stripe payment flow here or consume 1 contractor credit for this bid fee for free
+
+            # Once payment is confirmed, prepare bid record and submit
             bid_record = bid_data.model_dump()
             bid_record["contractor_id"] = contractor_id
             bid_record["status"] = BidStatus.SUBMITTED.value
@@ -127,8 +129,6 @@ class BidService:
                 raise DatabaseError("Failed to create your bid")
 
             bid = BidResponse(**result.data[0])
-
-            # Perform Stripe payment flow (we will do this later) or use / consume 1 contractor credit for this bid fee for free
 
             # Once this bid is fully submitted (either payment processed success or 1 contractor credit consumed), Check if its the 5th bid one for this job
             # if it is, we will need to update the job status to CLOSED (VERY IMPORTANT)
@@ -220,9 +220,10 @@ class BidService:
                 # validation
                 await self._validate_job_available_for_bidding(current_bid["job_id"], contractor_id)
 
-                update_data["status"] = BidStatus.SUBMITTED.value
-
                 # Perform Stripe payment flow or consume 1 contractor credit for this bid fee for free
+
+                # once payment is confirmed, update status to SUBMITTED
+                update_data["status"] = BidStatus.SUBMITTED.value
 
                 # Once this bid is fully submitted + payment processed, we need to check if it this is the full bid as this is the 5th one for this job
                 # if it is, we will need to update the job status to CLOSED (VERY IMPORTANT)
