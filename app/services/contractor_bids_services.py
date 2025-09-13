@@ -1,5 +1,5 @@
 from supabase import AsyncClient
-from app.models.bid_models import BidCardResponse, BidCreate, BidUpdate, BidDraftCreate, BidResponse, BidDetailResponse, BidStatus
+from app.models.bid_models import BidCardResponse, BidCreate, BidDraftCreate, BidResponse, BidDetailResponse, BidStatus
 from app.custom_error import UserNotFoundError, DatabaseError, ServerError, ValidationError
 from typing import List, Optional
 import logging
@@ -49,9 +49,7 @@ class BidService:
             raise ValidationError("Cannot bid on your own job")
 
         # Check bid count (max 5 bids per job)
-        bid_count_result = (
-            await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").neq("status", "declined").execute()
-        )
+        bid_count_result = await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").execute()
         bid_count = len(bid_count_result.data) if bid_count_result.data else 0
 
         if bid_count >= 5:
@@ -59,7 +57,7 @@ class BidService:
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
-    async def _validate_no_existing_bid(self, job_id: str, contractor_id: str, exclude_bid_id: Optional[str] = None) -> None:
+    async def _validate_no_existing_bid_or_draft(self, job_id: str, contractor_id: str, exclude_bid_id: Optional[str] = None) -> None:
         """Validate contractor hasn't already bid on this job"""
         query = self.supabase_client.table("bids").select("id").eq("job_id", job_id).eq("contractor_id", contractor_id)
 
@@ -103,6 +101,7 @@ class BidService:
     # CORE BID OPERATIONS
     # =====================================================================================================
 
+    # checked
     async def create_bid(self, clerk_user_id: str, bid_data: BidCreate) -> BidResponse:
         """Create a new bid submission"""
         try:
@@ -112,7 +111,7 @@ class BidService:
             await self._validate_job_available_for_bidding(bid_data.job_id, contractor_id)
 
             # Validate no existing bid from this contractor
-            await self._validate_no_existing_bid(bid_data.job_id, contractor_id)
+            await self._validate_no_existing_bid_or_draft(bid_data.job_id, contractor_id)
 
             # Validate bid data
             self._validate_bid_data(bid_data.price_min, bid_data.price_max)
@@ -120,7 +119,7 @@ class BidService:
             # Prepare bid record
             bid_record = bid_data.model_dump()
             bid_record["contractor_id"] = contractor_id
-            bid_record["status"] = BidStatus.PENDING.value
+            bid_record["status"] = BidStatus.SUBMITTED.value
 
             # Create bid
             result = await self.supabase_client.table("bids").insert(bid_record).execute()
@@ -129,12 +128,13 @@ class BidService:
 
             bid = BidResponse(**result.data[0])
 
-            # Perform Stripe payment flow (we will do this later)
+            # Perform Stripe payment flow (we will do this later) or use / consume 1 contractor credit for this bid fee for free
 
-            # Once this bid is fully submitted + payment processed, we need to check if it this is the full bid as this is the 5th one for this job
+            # Once this bid is fully submitted (either payment processed success or 1 contractor credit consumed), Check if its the 5th bid one for this job
             # if it is, we will need to update the job status to CLOSED (VERY IMPORTANT)
+
             job_bids = (
-                await self.supabase_client.table("bids").select("id").eq("job_id", bid_data.job_id).eq("status", BidStatus.PENDING.value).execute()
+                await self.supabase_client.table("bids").select("id").eq("job_id", bid_data.job_id).eq("status", BidStatus.SUBMITTED.value).execute()
             )
             if len(job_bids.data) == 5:
                 await self.supabase_client.table("jobs").update({"status": JobStatus.CLOSED.value}).eq("id", bid_data.job_id).execute()
@@ -150,16 +150,17 @@ class BidService:
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
+    # checked
     async def save_bid_draft(self, clerk_user_id: str, draft_data: BidDraftCreate) -> BidResponse:
         """Save bid as draft"""
         try:
             contractor_id = await self._get_user_id(clerk_user_id)
 
-            # Basic validation - job should exist and be open
+            # Basic validation - job should exist / open and available for bidding with less than 5 bids
             await self._validate_job_available_for_bidding(draft_data.job_id, contractor_id)
 
-            # Validate no existing bid from this contractor
-            await self._validate_no_existing_bid(draft_data.job_id, contractor_id)
+            # Validate no existing bid / draft from this contractor
+            await self._validate_no_existing_bid_or_draft(draft_data.job_id, contractor_id)
 
             # Validate price data if provided
             if draft_data.price_min is not None and draft_data.price_max is not None:
@@ -188,7 +189,8 @@ class BidService:
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
-    async def update_bid(self, clerk_user_id: str, bid_id: str, bid_data: BidUpdate, is_draft_submit: bool = False) -> BidResponse:
+    # checked
+    async def update_bid(self, clerk_user_id: str, bid_id: str, bid_data: BidCreate, is_draft_submit: bool = False) -> BidResponse:
         """Update existing bid"""
         try:
             contractor_id = await self._get_user_id(clerk_user_id)
@@ -201,7 +203,7 @@ class BidService:
             current_bid = bid_result.data[0]
 
             # Validate bid can be updated
-            if current_bid["status"] not in [BidStatus.DRAFT.value, BidStatus.PENDING.value]:
+            if current_bid["status"] not in [BidStatus.DRAFT.value, BidStatus.SUBMITTED.value]:
                 raise ValidationError("Cannot edit bid in current status")
 
             # Prepare update data
@@ -213,17 +215,14 @@ class BidService:
             if price_min is not None and price_max is not None:
                 self._validate_bid_data(price_min, price_max)
 
-            # Handle draft submission
+            # Handle draft submission case
             if is_draft_submit and current_bid["status"] == BidStatus.DRAFT.value:
-                # Basic validation - job should exist and be open
+                # validation
                 await self._validate_job_available_for_bidding(current_bid["job_id"], contractor_id)
 
-                # Validate no existing bid from this contractor
-                # await self._validate_no_existing_bid(current_bid["job_id"], contractor_id)
+                update_data["status"] = BidStatus.SUBMITTED.value
 
-                update_data["status"] = BidStatus.PENDING.value
-
-                # Perform Stripe payment flow (we will do this later)
+                # Perform Stripe payment flow or consume 1 contractor credit for this bid fee for free
 
                 # Once this bid is fully submitted + payment processed, we need to check if it this is the full bid as this is the 5th one for this job
                 # if it is, we will need to update the job status to CLOSED (VERY IMPORTANT)
@@ -231,10 +230,10 @@ class BidService:
                     await self.supabase_client.table("bids")
                     .select("*")
                     .eq("job_id", current_bid["job_id"])
-                    .eq("status", BidStatus.PENDING.value)
+                    .eq("status", BidStatus.SUBMITTED.value)
                     .execute()
                 )
-                if len(job_bids.data) >= 5:
+                if len(job_bids.data) == 5:
                     await self.supabase_client.table("jobs").update({"status": JobStatus.CLOSED.value}).eq("id", current_bid["job_id"]).execute()
 
             # Update bid
@@ -255,8 +254,9 @@ class BidService:
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
-    async def delete_bid(self, clerk_user_id: str, bid_id: str) -> bool:
-        """Delete bid"""
+    # checked
+    async def delete_bid_draft(self, clerk_user_id: str, bid_id: str) -> bool:
+        """Delete bid draft"""
         try:
             contractor_id = await self._get_user_id(clerk_user_id)
 
@@ -266,10 +266,10 @@ class BidService:
                 raise ValidationError("Bid not found or permission denied")
 
             current_status = bid_result.data[0]["status"]
-            if current_status not in [BidStatus.DRAFT.value, BidStatus.PENDING.value, BidStatus.DECLINED.value]:
-                raise ValidationError("Cannot delete bid in current status")
+            if current_status not in [BidStatus.DRAFT.value]:
+                raise ValidationError("Cannot delete bid in current status (only drafts can be deleted)")
 
-            # Delete bid
+            # Delete bid draft
             result = await self.supabase_client.table("bids").delete().eq("id", bid_id).execute()
 
             if result.data:
@@ -284,10 +284,9 @@ class BidService:
                 raise e
             raise ServerError(f"Failed to delete your bid")
 
-    # =====================================================================================================
-    # BID READING OPERATIONS
-    # =====================================================================================================
+    # --------------------------------------------------------------------------------------------------------------------------------------------
 
+    # checked
     async def get_contractor_bid_cards(self, clerk_user_id: str, status_filter: Optional[str] = None) -> List[BidCardResponse]:
         """Get bid cards for contractor dashboard"""
         try:
@@ -341,6 +340,7 @@ class BidService:
 
     # ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
+    # checked
     async def get_bid_detail(self, clerk_user_id: str, bid_id: str) -> BidDetailResponse:
         """Get complete bid details with job context and buyer contact info (if confirmed)"""
         try:
@@ -353,7 +353,6 @@ class BidService:
                     """
                 *,
                 jobs!inner(
-                    buyer_id,
                     title,
                     job_type,
                     job_budget,
@@ -372,23 +371,6 @@ class BidService:
             bid_data = bid_result.data[0]
             job_data = bid_data["jobs"]
 
-            # Initialize buyer contact info as None
-            buyer_contact_email = None
-            buyer_contact_phone = None
-
-            # Only reveal buyer contact info if bid is confirmed
-            if bid_data["status"] == "confirmed":
-                contact_result = (
-                    await self.supabase_client.table("buyer_profiles")
-                    .select("contact_email, phone_number")
-                    .eq("user_id", job_data["buyer_id"])
-                    .execute()
-                )
-                if contact_result.data:
-                    contact_data = contact_result.data[0]
-                    buyer_contact_email = contact_data["contact_email"]
-                    buyer_contact_phone = contact_data["phone_number"]
-
             # Create bid detail response
             bid_detail = BidDetailResponse(
                 id=bid_data["id"],
@@ -398,10 +380,7 @@ class BidService:
                 price_min=bid_data["price_min"],
                 price_max=bid_data["price_max"],
                 timeline_estimate=bid_data["timeline_estimate"],
-                work_description=bid_data["work_description"],
-                additional_notes=bid_data["additional_notes"],
                 status=bid_data["status"],
-                is_selected=bid_data["is_selected"],
                 created_at=bid_data["created_at"],
                 updated_at=bid_data["updated_at"],
                 # Job context
@@ -409,9 +388,6 @@ class BidService:
                 job_type=job_data["job_type"],
                 job_budget=job_data["job_budget"],
                 job_city=job_data["city"],
-                # Buyer contact (only if confirmed)
-                buyer_contact_email=buyer_contact_email,
-                buyer_contact_phone=buyer_contact_phone,
             )
 
             logger.info(f"✅ Bid detail retrieved for contractor - bid: {bid_id}")
@@ -422,104 +398,3 @@ class BidService:
             if isinstance(e, (UserNotFoundError, ValidationError)):
                 raise e
             raise ServerError(f"Failed to get bid details")
-
-    # =====================================================================================================
-    # BID DECLINE AND CONFIRM OPERATIONS
-    # =====================================================================================================
-
-    async def decline_selected_bid(self, clerk_user_id: str, bid_id: str) -> bool:
-        """Decline a selected bid and update job status accordingly"""
-        try:
-            user_id = await self._get_user_id(clerk_user_id)
-
-            # Verify contractor owns this bid and it's selected
-            bid_result = await self.supabase_client.table("bids").select("*").eq("id", bid_id).eq("contractor_id", user_id).execute()
-            if not bid_result.data:
-                raise ValidationError("Bid not found or permission denied")
-
-            bid_data = bid_result.data[0]
-
-            # Check if bid is in selected status
-            if bid_data["status"] != "selected" or not bid_data["is_selected"]:
-                raise ValidationError("This bid is not currently selected")
-
-            job_id = bid_data["job_id"]
-
-            # Start transaction-like operations
-            # 1. Update bid status to declined and unselect it
-            await self.supabase_client.table("bids").update({"status": "declined", "is_selected": False}).eq("id", bid_id).execute()
-
-            # 2. Count remaining active bids for the job (excluding declined and draft)
-            remaining_bids_result = (
-                await self.supabase_client.table("bids").select("id").eq("job_id", job_id).neq("status", "draft").neq("status", "declined").execute()
-            )
-            remaining_bid_count = len(remaining_bids_result.data) if remaining_bids_result.data else 0
-
-            # 3. Update job status back to open (declined bids don't count toward bid limit)
-            new_job_status = "open"  # Always goes back to open since declined bid is removed from count
-
-            await self.supabase_client.table("jobs").update({"status": new_job_status}).eq("id", job_id).execute()
-
-            logger.info(f"✅ Bid declined successfully - bid: {bid_id}, job: {job_id}, remaining bids: {remaining_bid_count}")
-
-            # TODO: Send email notification to buyer (placeholder for now)
-            # await self._send_bid_decline_notification(job_id, bid_id)
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error declining selected bid - {str(e)}")
-            if isinstance(e, (UserNotFoundError, ValidationError)):
-                raise e
-            raise ServerError(f"Failed to decline bid selection")
-
-    # ---------------------------------------------------------------------------------------------------------------------------------------
-
-    async def confirm_selected_bid(self, clerk_user_id: str, bid_id: str) -> bool:
-        """Confirm a selected bid (skip payment for now) and complete the job"""
-        try:
-            user_id = await self._get_user_id(clerk_user_id)
-
-            # Verify contractor owns this bid and it's selected
-            bid_result = await self.supabase_client.table("bids").select("*").eq("id", bid_id).eq("contractor_id", user_id).execute()
-            if not bid_result.data:
-                raise ValidationError("Bid not found or permission denied")
-
-            bid_data = bid_result.data[0]
-
-            # Check if bid is in selected status
-            if bid_data["status"] != "selected" or not bid_data["is_selected"]:
-                raise ValidationError("This bid is not currently selected")
-
-            job_id = bid_data["job_id"]
-
-            # Start transaction-like operations
-            # 1. Update this bid to confirmed status
-            await self.supabase_client.table("bids").update(
-                {
-                    "status": "confirmed"
-                    # Keep is_selected as True since this is the confirmed bid
-                }
-            ).eq("id", bid_id).execute()
-
-            # 2. Update job status to confirmed
-            await self.supabase_client.table("jobs").update({"status": "confirmed"}).eq("id", job_id).execute()
-
-            # 3. Decline all other bids for this job
-            await self.supabase_client.table("bids").update({"status": "declined", "is_selected": False}).eq("job_id", job_id).neq(
-                "id", bid_id
-            ).execute()
-
-            logger.info(f"✅ Bid confirmed successfully - bid: {bid_id}, job: {job_id}")
-
-            # TODO: Send email notifications (placeholder for now)
-            # await self._send_bid_confirmation_notification(job_id, bid_id)
-            # await self._send_declined_bid_notifications(job_id, bid_id)
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error confirming selected bid - {str(e)}")
-            if isinstance(e, (UserNotFoundError, ValidationError)):
-                raise e
-            raise ServerError(f"Failed to confirm bid selection")

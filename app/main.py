@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.utils.supabase_client_handlers import create_supabase_client, close_supabase_client
-from app.routes.user_routes import user_router
+from app.routes.buyer_contact_routes import user_router
 from app.routes.clerk_webhook_routes import clerk_webhook_router
 from app.configs.app_settings import settings
 from app.routes.buyer_jobs_routes import buyer_job_router

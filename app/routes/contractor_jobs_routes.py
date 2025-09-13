@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException, Query
 from supabase import AsyncClient
+from app.models.job_models import JobDetailViewResponse
 from app.utils.supabase_client_handlers import get_supabase_client
 from app.utils.user_auth import get_current_clerk_user_id
 from typing import Optional, List, Tuple
 from app.services.contractor_jobs_services import ContractorJobService
-from app.models.job_models import ContractorJobCardResponse, JobDetailViewResponse
 from typing import List, Optional
+from app.models.contractor_job_models import ContractorJobCardResponse, PreBidJobDetailResponse
 
 
 contractor_jobs_router = APIRouter(prefix="/contractors", tags=["Contractors"])
@@ -19,20 +20,22 @@ async def get_contractor_job_service(supabase_client: AsyncClient = Depends(get_
 # ################################################################################################################################################
 
 
+# checked
 @contractor_jobs_router.get("/available-jobs", response_model=List[ContractorJobCardResponse])
-async def get_available_jobs_for_contractor(
+async def get_available_job_cards(
     city: Optional[str] = Query(None, description="Filter jobs by city"),
     job_type: Optional[str] = Query(None, description="Filter jobs by job type"),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     contractor_job_service: ContractorJobService = Depends(get_contractor_job_service),
 ):
     """Get all available jobs that contractors can bid on"""
-    return await contractor_job_service.get_available_jobs(clerk_user_id, city, job_type)
+    return await contractor_job_service.get_available_job_cards(clerk_user_id, city, job_type)
 
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------
 
 
+# checked
 @contractor_jobs_router.get("/job-cities", response_model=List[str])
 async def get_job_cities(
     contractor_job_service: ContractorJobService = Depends(get_contractor_job_service),
@@ -44,11 +47,26 @@ async def get_job_cities(
 # ------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-@contractor_jobs_router.get("/jobs/{job_id}", response_model=JobDetailViewResponse)
-async def get_contractor_job_detail(
+# checked
+@contractor_jobs_router.get("/pre-bid-job/{job_id}", response_model=PreBidJobDetailResponse)
+async def get_pre_bid_job_detail(
     job_id: str,
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     contractor_job_service: ContractorJobService = Depends(get_contractor_job_service),
 ):
     """Get complete job details for contractor review"""
-    return await contractor_job_service.get_job_detail_for_contractor(clerk_user_id, job_id)
+    return await contractor_job_service.get_pre_bid_job_detail(clerk_user_id, job_id)
+
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+# checked
+@contractor_jobs_router.get("/full-job/{job_id}", response_model=JobDetailViewResponse)
+async def get_contractor_full_job_detail(
+    job_id: str,
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    contractor_job_service: ContractorJobService = Depends(get_contractor_job_service),
+):
+    """Get complete job details for contractor review"""
+    return await contractor_job_service.get_contractor_full_job_detail(clerk_user_id, job_id)

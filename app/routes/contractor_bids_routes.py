@@ -1,11 +1,9 @@
-# Create app/routes/bid_routes.py
-
 from fastapi import APIRouter, Depends, Form, Query
 from supabase import AsyncClient
 from app.utils.supabase_client_handlers import get_supabase_client
 from app.utils.user_auth import get_current_clerk_user_id
 from app.services.contractor_bids_services import BidService
-from app.models.bid_models import BidCreate, BidUpdate, BidDraftCreate, BidResponse, BidDetailResponse, BidCardResponse
+from app.models.bid_models import BidCreate, BidDraftCreate, BidResponse, BidDetailResponse, BidCardResponse
 from typing import Optional, List
 
 bid_router = APIRouter(prefix="/bids", tags=["Bids"])
@@ -19,6 +17,7 @@ async def get_bid_service(supabase_client: AsyncClient = Depends(get_supabase_cl
 ########################################################################################################################
 
 
+# checked
 @bid_router.post("", response_model=BidResponse)
 async def create_bid(
     job_id: str = Form(...),
@@ -26,8 +25,6 @@ async def create_bid(
     price_min: str = Form(...),
     price_max: str = Form(...),
     timeline_estimate: str = Form(...),
-    work_description: str = Form(...),
-    additional_notes: str = Form(None),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     bid_service: BidService = Depends(get_bid_service),
 ):
@@ -40,8 +37,6 @@ async def create_bid(
         price_min=price_min,
         price_max=price_max,
         timeline_estimate=timeline_estimate,
-        work_description=work_description,
-        additional_notes=additional_notes,
     )
 
     return await bid_service.create_bid(clerk_user_id, bid_data)
@@ -50,6 +45,7 @@ async def create_bid(
 # ------------------------------------------------------------------------------------------------------------------------
 
 
+# checked
 @bid_router.post("/drafts", response_model=BidResponse)
 async def save_bid_draft(
     job_id: str = Form(...),
@@ -57,8 +53,6 @@ async def save_bid_draft(
     price_min: Optional[str] = Form(None),
     price_max: Optional[str] = Form(None),
     timeline_estimate: str = Form(None),
-    work_description: str = Form(None),
-    additional_notes: str = Form(None),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     bid_service: BidService = Depends(get_bid_service),
 ):
@@ -71,8 +65,6 @@ async def save_bid_draft(
         price_min=price_min,
         price_max=price_max,
         timeline_estimate=timeline_estimate,
-        work_description=work_description,
-        additional_notes=additional_notes,
     )
 
     return await bid_service.save_bid_draft(clerk_user_id, draft_data)
@@ -81,29 +73,28 @@ async def save_bid_draft(
 # ------------------------------------------------------------------------------------------------------------------------
 
 
+# checked
 @bid_router.put("/{bid_id}", response_model=BidResponse)
 async def update_bid(
     bid_id: str,
     is_draft_submit: bool = Query(False, alias="is-draft-submit"),
     title: str = Form(None),
+    job_id: str = Form(None),
     price_min: Optional[str] = Form(None),
     price_max: Optional[str] = Form(None),
     timeline_estimate: str = Form(None),
-    work_description: str = Form(None),
-    additional_notes: str = Form(None),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     bid_service: BidService = Depends(get_bid_service),
 ):
     """Update existing bid"""
 
     # Create update data
-    bid_data = BidUpdate(
+    bid_data = BidCreate(
+        job_id=job_id,
         title=title,
         price_min=price_min,
         price_max=price_max,
         timeline_estimate=timeline_estimate,
-        work_description=work_description,
-        additional_notes=additional_notes,
     )
 
     return await bid_service.update_bid(clerk_user_id, bid_id, bid_data, is_draft_submit)
@@ -112,8 +103,9 @@ async def update_bid(
 # ------------------------------------------------------------------------------------------------------------------------
 
 
+# checked
 @bid_router.get("/contractor-bids", response_model=List[BidCardResponse])
-async def get_contractor_bids(
+async def get_contractor_bid_cards(
     status: Optional[str] = Query(None, description="Filter bids by status (draft, pending, selected, etc.)"),
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     bid_service: BidService = Depends(get_bid_service),
@@ -125,19 +117,21 @@ async def get_contractor_bids(
 # ------------------------------------------------------------------------------------------------------------------------
 
 
+# checked
 @bid_router.delete("/{bid_id}", response_model=bool)
-async def delete_bid(
+async def delete_bid_draft(
     bid_id: str,
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     bid_service: BidService = Depends(get_bid_service),
 ):
-    """Delete bid"""
-    return await bid_service.delete_bid(clerk_user_id, bid_id)
+    """Delete bid draft (only drafts can be deleted)"""
+    return await bid_service.delete_bid_draft(clerk_user_id, bid_id)
 
 
 # ------------------------------------------------------------------------------------------------------------------------
 
 
+# checked
 @bid_router.get("/{bid_id}", response_model=BidDetailResponse)
 async def get_bid_detail(
     bid_id: str,
@@ -146,29 +140,3 @@ async def get_bid_detail(
 ):
     """Get complete bid details with job context"""
     return await bid_service.get_bid_detail(clerk_user_id, bid_id)
-
-
-# ------------------------------------------------------------------------------------------------------------------------
-
-
-# @bid_router.post("/{bid_id}/decline", response_model=bool)
-# async def decline_selected_bid(
-#     bid_id: str,
-#     clerk_user_id: str = Depends(get_current_clerk_user_id),
-#     bid_service: BidService = Depends(get_bid_service),
-# ):
-#     """Decline a selected bid"""
-#     return await bid_service.decline_selected_bid(clerk_user_id, bid_id)
-
-
-# # ------------------------------------------------------------------------------------------------------------------------
-
-
-# @bid_router.post("/{bid_id}/confirm", response_model=bool)
-# async def confirm_selected_bid(
-#     bid_id: str,
-#     clerk_user_id: str = Depends(get_current_clerk_user_id),
-#     bid_service: BidService = Depends(get_bid_service),
-# ):
-#     """Confirm a selected bid (skip payment for now)"""
-#     return await bid_service.confirm_selected_bid(clerk_user_id, bid_id)

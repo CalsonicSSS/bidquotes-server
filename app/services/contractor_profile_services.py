@@ -1,7 +1,6 @@
 from supabase import AsyncClient
-from app.models.contractor_models import (  # Assuming you add the contractor models to user_models.py
+from app.models.contractor_profile_models import (
     ContractorProfileCreate,
-    ContractorProfileUpdate,
     ContractorProfileResponse,
     ContractorProfileImageResponse,
 )
@@ -41,9 +40,9 @@ class ContractorProfileService:
         """Internal: Upload single profile image and return (image_url, storage_path)"""
         try:
             # Generate storage path
-            storage_path = f"contractor-profiles/{profile_id}/{uuid.uuid4()}"
+            storage_path = f"{profile_id}/{uuid.uuid4()}"
 
-            # Upload to Supabase Storage
+            # Upload to Supabase Storage under 'contractor-profile-images' bucket
             await self.supabase_client.storage.from_("contractor-profile-images").upload(
                 path=storage_path, file=file_content, file_options={"content-type": mimetypes.guess_type(file_name)[0] or "image/jpeg"}
             )
@@ -60,7 +59,7 @@ class ContractorProfileService:
 
     # ------------------------------------------------------------------------------------------------------------------------------
 
-    async def _upload_profile_images_create_records(self, profile_id: str, image_files: list[tuple[bytes, str]]) -> None:
+    async def _upload_all_profile_images_and_create_records(self, profile_id: str, image_files: list[tuple[bytes, str]]) -> None:
         """Internal: Upload profile images and create database records"""
         # if not image_files:
         #     return
@@ -85,7 +84,7 @@ class ContractorProfileService:
 
     # ------------------------------------------------------------------------------------------------------------------------------
 
-    async def _delete_profile_images(self, profile_id: str) -> None:
+    async def _delete_all_profile_images(self, profile_id: str) -> None:
         """Internal: Delete all images for a profile (both storage and database)"""
         try:
             # Get all image records for this profile
@@ -111,6 +110,7 @@ class ContractorProfileService:
     # CORE OPERATIONS
     # =====================================================================================================
 
+    # checked
     async def get_contractor_profile(self, clerk_user_id: str) -> ContractorProfileResponse:
         """Get contractor profile information with images"""
         try:
@@ -144,7 +144,70 @@ class ContractorProfileService:
                 raise e
             raise ServerError(f"Server operation failed: {str(e)}")
 
-    # no clerk id needed here
+    # -------------------------------------------------------------------------------------------------------------------------------
+    # checked
+
+    async def save_contractor_profile(
+        self, clerk_user_id: str, profile_data: ContractorProfileCreate, image_files: List[Tuple[bytes, str]] = None
+    ) -> ContractorProfileResponse:
+        """Save or update contractor profile information with optional images"""
+        try:
+            user_id = await self._get_user_id(clerk_user_id)
+
+            # Prepare profile data (no JSON conversion needed now)
+            profile_record = profile_data.model_dump(exclude_none=True)
+
+            # Check if profile already exists
+            existing_result = await self.supabase_client.table("contractor_profiles").select("*").eq("user_id", user_id).execute()
+
+            if existing_result.data:
+                # Update existing profile
+                profile_id = existing_result.data[0]["id"]
+                result = await self.supabase_client.table("contractor_profiles").update(profile_record).eq("user_id", user_id).execute()
+            else:
+                # Create new profile
+                profile_record["user_id"] = user_id
+                result = await self.supabase_client.table("contractor_profiles").insert(profile_record).execute()
+                profile_id = result.data[0]["id"]
+
+            if not result.data:
+                raise DatabaseError("Failed to save contractor profile")
+
+            # Handle images (always)
+            await self._delete_all_profile_images(profile_id)
+            await self._upload_all_profile_images_and_create_records(profile_id, image_files)
+
+            # Get the complete profile with images for response
+            return await self.get_contractor_profile(clerk_user_id)
+
+        except Exception as e:
+            logger.error(f"Error in save_contractor_profile: {str(e)}")
+            if isinstance(e, (UserNotFoundError, DatabaseError)):
+                raise e
+            raise ServerError(f"Server operation failed: {str(e)}")
+
+    # -------------------------------------------------------------------------------------------------------------------------------
+
+    # checked
+    async def check_contractor_profile_completion(self, clerk_user_id: str) -> bool:
+        """Check if contractor profile is complete"""
+        try:
+            user_id = await self._get_user_id(clerk_user_id)
+
+            # Use the database function we created
+            result = await self.supabase_client.rpc("is_contractor_profile_complete", {"user_uuid": user_id}).execute()
+
+            return result.data if result.data is not None else False
+
+        except Exception as e:
+            logger.error(f"Error checking profile completion: {str(e)}")
+            if isinstance(e, UserNotFoundError):
+                raise e
+            raise ServerError(f"Server operation failed: {str(e)}")
+
+    # ------------------------------------------------------------------------------------------------------------------------------
+
+    # checked
     async def get_contractor_profile_by_contractor_id(self, contractor_id: str) -> ContractorProfileResponse:
         """Get contractor profile information by contractor user ID"""
         try:
@@ -174,88 +237,6 @@ class ContractorProfileService:
 
         except Exception as e:
             logger.error(f"Error in get_contractor_profile_by_id: {str(e)}")
-            if isinstance(e, UserNotFoundError):
-                raise e
-            raise ServerError(f"Server operation failed: {str(e)}")
-
-    # ------------------------------------------------------------------------------------------------------------------------------
-
-    async def get_contractor_profile_name(self, clerk_user_id: str) -> str:
-        """Get contractor profile information with images"""
-        try:
-            user_id = await self._get_user_id(clerk_user_id)
-
-            # Always get profile with images
-            result = await self.supabase_client.table("contractor_profiles").select("contractor_name").eq("user_id", user_id).execute()
-
-            if not result.data:
-                raise ValidationError("Contractor profile not found")
-
-            profile_data = result.data[0]
-
-            return profile_data["contractor_name"]
-
-        except Exception as e:
-            logger.error(f"Error in get_contractor_profile: {str(e)}")
-            if isinstance(e, UserNotFoundError):
-                raise e
-            raise ServerError(f"Server operation failed: {str(e)}")
-
-    # -------------------------------------------------------------------------------------------------------------------------------
-
-    async def save_contractor_profile(
-        self, clerk_user_id: str, profile_data: ContractorProfileCreate | ContractorProfileUpdate, image_files: List[Tuple[bytes, str]] = None
-    ) -> ContractorProfileResponse:
-        """Save or update contractor profile information with optional images"""
-        try:
-            user_id = await self._get_user_id(clerk_user_id)
-
-            # Check if profile already exists
-            existing_result = await self.supabase_client.table("contractor_profiles").select("*").eq("user_id", user_id).execute()
-
-            # Prepare profile data (no JSON conversion needed now)
-            profile_record = profile_data.model_dump(exclude_unset=True)
-
-            if existing_result.data:
-                # Update existing profile
-                profile_id = existing_result.data[0]["id"]
-                result = await self.supabase_client.table("contractor_profiles").update(profile_record).eq("user_id", user_id).execute()
-            else:
-                # Create new profile
-                profile_record["user_id"] = user_id
-                result = await self.supabase_client.table("contractor_profiles").insert(profile_record).execute()
-                profile_id = result.data[0]["id"]
-
-            if not result.data:
-                raise DatabaseError("Failed to save contractor profile")
-
-            # Handle images (always)
-            await self._delete_profile_images(profile_id)
-            await self._upload_profile_images_create_records(profile_id, image_files)
-
-            # Get the complete profile with images for response
-            return await self.get_contractor_profile(clerk_user_id)
-
-        except Exception as e:
-            logger.error(f"Error in save_contractor_profile: {str(e)}")
-            if isinstance(e, (UserNotFoundError, DatabaseError)):
-                raise e
-            raise ServerError(f"Server operation failed: {str(e)}")
-
-    # -------------------------------------------------------------------------------------------------------------------------------
-
-    async def is_contractor_profile_complete(self, clerk_user_id: str) -> bool:
-        """Check if contractor profile is complete"""
-        try:
-            user_id = await self._get_user_id(clerk_user_id)
-
-            # Use the database function we created
-            result = await self.supabase_client.rpc("is_contractor_profile_complete", {"user_uuid": user_id}).execute()
-
-            return result.data if result.data is not None else False
-
-        except Exception as e:
-            logger.error(f"Error checking profile completion: {str(e)}")
             if isinstance(e, UserNotFoundError):
                 raise e
             raise ServerError(f"Server operation failed: {str(e)}")

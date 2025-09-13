@@ -6,7 +6,7 @@ from typing import Optional
 # 1. During app startup, the lifespan block runs await create_supabase_client()
 # 2. Inside create_supabase_client(), _supabase_client is initially None, so the function creates the async client and assigns it to the global _supabase_client
 # 3. After that, _supabase_client holds your initialized AsyncClient by "variable reassignment" (and this refers to the _supabase_client at the module level)
-# 4. later when you call get_supabase_client(), from this module, it will refer to this initialized client already
+# 4. Later when you call get_supabase_client(), from this module, it will refer to this initialized client already
 
 
 _supabase_client: Optional[AsyncClient] = None

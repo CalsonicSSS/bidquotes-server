@@ -6,10 +6,7 @@ from enum import Enum
 
 class BidStatus(str, Enum):
     DRAFT = "draft"
-    PENDING = "pending"
-    SELECTED = "selected"
-    CONFIRMED = "confirmed"
-    DECLINED = "declined"
+    SUBMITTED = "submitted"
 
 
 class BidCreate(BaseModel):
@@ -18,17 +15,6 @@ class BidCreate(BaseModel):
     price_min: str
     price_max: str
     timeline_estimate: str
-    work_description: str
-    additional_notes: Optional[str] = None
-
-
-class BidUpdate(BaseModel):
-    title: Optional[str] = None
-    price_min: Optional[str] = None
-    price_max: Optional[str] = None
-    timeline_estimate: Optional[str] = None
-    work_description: Optional[str] = None
-    additional_notes: Optional[str] = None
 
 
 class BidDraftCreate(BaseModel):
@@ -37,8 +23,6 @@ class BidDraftCreate(BaseModel):
     price_min: Optional[str] = None
     price_max: Optional[str] = None
     timeline_estimate: Optional[str] = None
-    work_description: Optional[str] = None
-    additional_notes: Optional[str] = None
 
 
 class BidResponse(BaseModel):
@@ -49,10 +33,7 @@ class BidResponse(BaseModel):
     price_min: str
     price_max: str
     timeline_estimate: str
-    work_description: str
-    additional_notes: Optional[str]
     status: BidStatus
-    is_selected: bool
     created_at: datetime
     updated_at: datetime
 
@@ -78,10 +59,7 @@ class BidDetailResponse(BaseModel):
     price_min: str
     price_max: str
     timeline_estimate: str
-    work_description: str
-    additional_notes: Optional[str]
     status: BidStatus
-    is_selected: bool
     created_at: datetime
     updated_at: datetime
     # Include job info for context
@@ -89,9 +67,6 @@ class BidDetailResponse(BaseModel):
     job_type: str
     job_budget: str
     job_city: str
-    # Buyer contact info (only revealed when bid is confirmed)
-    buyer_contact_email: Optional[str] = None
-    buyer_contact_phone: Optional[str] = None
 
 
 # ------------------------------------------------------
@@ -108,7 +83,6 @@ class BuyerBidCardInfo(BaseModel):
     price_max: str
     timeline_estimate: str
     status: str
-    is_selected: bool
     created_at: datetime
 
 
@@ -122,10 +96,7 @@ class BuyerBidDetailResponse(BaseModel):
     price_min: str
     price_max: str
     timeline_estimate: str
-    work_description: str
-    additional_notes: Optional[str]
     status: BidStatus
-    is_selected: bool
     created_at: datetime
     updated_at: datetime
     # Job context info for reference

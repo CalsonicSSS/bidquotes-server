@@ -22,9 +22,6 @@ class JobStatus(str, Enum):
     DRAFT = "draft"
     OPEN = "open"
     CLOSED = "closed"
-    FULL_BID = "full_bid"
-    WAITING_CONFIRMATION = "waiting_confirmation"
-    CONFIRMED = "confirmed"
 
 
 class JobCreate(BaseModel):
@@ -92,8 +89,6 @@ class JobResponse(BaseModel):
     city: str
     other_requirements: Optional[str]
     status: JobStatus
-    selection_count: int
-    max_selections: int
     created_at: datetime
     updated_at: datetime
 
@@ -109,13 +104,11 @@ class JobDetailViewResponse(BaseModel):
     city: str
     other_requirements: Optional[str]
     status: JobStatus
-    selection_count: int
-    max_selections: int
     created_at: datetime
     updated_at: datetime
     images: List[JobImageResponse] = []
     bid_count: int = 0
-    bids: Optional[List[BuyerBidCardInfo]] = None  # Add this new field
+    bids: List[BuyerBidCardInfo] = []
 
 
 class JobCardResponse(BaseModel):
@@ -123,22 +116,6 @@ class JobCardResponse(BaseModel):
     title: str
     job_type: JobType
     status: JobStatus
-    bid_count: int
-    created_at: datetime
-    # Include first image if available
-    thumbnail_image: Optional[str] = None
-
-
-# -------------------------------------------------------------------------------
-# contractor side
-
-
-class ContractorJobCardResponse(BaseModel):
-    id: str
-    title: str
-    job_type: JobType
-    status: JobStatus
-    city: str  # Add city for contractors to see location
     bid_count: int
     created_at: datetime
     # Include first image if available
