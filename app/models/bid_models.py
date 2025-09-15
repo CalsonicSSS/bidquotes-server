@@ -73,6 +73,7 @@ class BidDetailResponse(BaseModel):
 class BidCreationStatus(str, Enum):
     SUBMITTED = "submitted"  # Bid successfully submitted (had credits)
     DRAFT_PAYMENT_REQUIRED = "draft_payment_required"  # Saved as draft, payment needed
+    BID_UPDATE_ONLY = "bid_update_only"  # Updated existing draft, no payment needed
 
 
 class BidCreationResponse(BaseModel):

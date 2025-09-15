@@ -19,8 +19,9 @@ class Settings(BaseSettings):
     # API Settings
     API_V1_STR: str = "/api/v1"
 
-    # Stripe
+    # Stripe settings
     STRIPE_SECRET_KEY: str
+    STRIPE_WEBHOOK_SECRET: str
 
     # domains
     CLIENT_DOMAIN: str

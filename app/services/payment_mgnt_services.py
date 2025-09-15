@@ -82,6 +82,7 @@ class PaymentService:
 
     # the bid id here is always in draft status for per bid payments
     # so we just name it as draft_bid_id to avoid confusion
+
     async def create_checkout_session_for_draft_bid_payment(self, contractor_id: str, draft_bid_id: str) -> Dict[str, str]:
         """Create Stripe checkout session for draft bid payment"""
         try:
@@ -102,38 +103,31 @@ class PaymentService:
             draft_bid = bid_result.data
 
             # Create success/cancel URLs that return to draft submission page
-            # These will be used inside the StripeConfig.create_checkout_session later
             base_url = settings.CLIENT_DOMAIN
             success_url = f"{base_url}/contractor-dashboard/payment-success?draft={draft_bid_id}"
             cancel_url = f"{base_url}/contractor-dashboard/post-bid?draft={draft_bid_id}&payment=cancelled"
 
-            # Metadata to track this payment
-            # This will be used inside the StripeConfig.create_checkout_session later
+            # Store ALL payment information in metadata for webhook processing
             metadata = {
-                "product_name": "Bid Submission Fee",  # this will display in Stripe session checkout redirect page
+                "product_name": "Bid Submission Fee",
                 "item_type": "bid_payment",
                 "contractor_id": contractor_id,
-                "job_id": draft_bid["job_id"],
+                "job_id": draft_bid["job_id"],  # Get job_id from the draft bid
                 "bid_id": draft_bid_id,
-                "bid_title": draft_bid["title"],
+                "amount_cad": str(PaymentConstants.BID_PAYMENT_AMOUNT_CAD / 100),  # Store as dollar amount
+                "credits_purchased": "0",  # This is not a credit purchase
             }
 
-            # Create Stripe checkout session (THIS IS THE CORE FUNCTIONALITY AND IS FULLY HANDLED BY STRIPE)
-            # it will return a session id and url to redirect to the checkout page (which is fully hosted by Stripe)
+            # Create Stripe checkout session
             session = StripeConfig.create_checkout_session(
-                amount_cents=PaymentConstants.BID_PAYMENT_AMOUNT_CAD, success_url=success_url, cancel_url=cancel_url, metadata=metadata
+                amount_cents=PaymentConstants.BID_PAYMENT_AMOUNT_CAD,
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata=metadata,
             )
 
-            # Save pending payment record
-            await self._create_payment_transaction_record(
-                contractor_id=contractor_id,
-                stripe_session_id=session.id,
-                item_type="bid_payment",
-                amount_cad=PaymentConstants.BID_PAYMENT_AMOUNT_CAD / 100,  # Convert cents to dollars
-                job_id=draft_bid["job_id"],
-                bid_id=draft_bid_id,
-                credits_purchased=0,
-            )
+            # ❌ REMOVED: No longer creating payment record here!
+            # We'll create it in the webhook when payment actually succeeds
 
             return {"session_id": session.id, "session_url": session.url}
 
@@ -153,7 +147,7 @@ class PaymentService:
                 .select("id")
                 .eq("contractor_id", contractor_id)
                 .eq("bid_id", bid_id)
-                .eq("status", "succeeded")
+                .eq("status", "succeeded")  # only count successful resulted payments
                 .execute()
             )
 
@@ -175,12 +169,14 @@ class PaymentService:
             success_url = f"{base_url}/contractor-dashboard?section=your-credits&payment=success&session_id={{CHECKOUT_SESSION_ID}}"
             cancel_url = f"{base_url}/contractor-dashboard?section=your-credits&payment=cancelled"
 
-            # Metadata to track this payment
+            # Store ALL payment information in metadata for webhook processing
             metadata = {
                 "product_name": f"Credits Package ({PaymentConstants.CREDIT_PURCHASE_QUANTITY} credits)",
                 "item_type": "credit_purchase",
                 "contractor_id": contractor_id,
-                "credits_quantity": str(PaymentConstants.CREDIT_PURCHASE_QUANTITY),
+                "amount_cad": str(PaymentConstants.CREDIT_PURCHASE_AMOUNT_CAD / 100),  # Store as dollar amount
+                "credits_purchased": str(PaymentConstants.CREDIT_PURCHASE_QUANTITY),
+                # No job_id or bid_id for credit purchases
             }
 
             # Create Stripe checkout session
@@ -188,14 +184,8 @@ class PaymentService:
                 amount_cents=PaymentConstants.CREDIT_PURCHASE_AMOUNT_CAD, success_url=success_url, cancel_url=cancel_url, metadata=metadata
             )
 
-            # Save pending payment record
-            await self._create_payment_transaction_record(
-                contractor_id=contractor_id,
-                stripe_session_id=session.id,
-                item_type="credit_purchase",
-                amount_cad=PaymentConstants.CREDIT_PURCHASE_AMOUNT_CAD / 100,  # Convert cents to dollars
-                credits_purchased=PaymentConstants.CREDIT_PURCHASE_QUANTITY,
-            )
+            # ❌ REMOVED: No longer creating payment record here!
+            # We'll create it in the webhook when payment actually succeeds
 
             return {"session_id": session.id, "session_url": session.url}
 
@@ -224,7 +214,7 @@ class PaymentService:
                     "credits_change": -1,
                     "credits_balance_after": new_balance,
                     "bid_id": bid_id,
-                    "description": f"Bid submission for job id: {job_id}",
+                    "description": f"Credit consumed for bid submission for job id: {job_id}",
                 }
             ).execute()
 

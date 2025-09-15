@@ -11,7 +11,7 @@ class PaymentConstants:
     BID_PAYMENT_AMOUNT_CAD = 7000  # $70.00 CAD in cents
     CREDIT_PURCHASE_AMOUNT_CAD = 70000  # $700.00 CAD in cents
     CREDIT_PURCHASE_QUANTITY = 20  # Credits received per purchase
-    CURRENCY = "cad"
+    CAD_CURRENCY = "cad"
 
     # Success/Cancel URLs (we'll use these later)
     DOMAIN = os.getenv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:3000")
@@ -22,7 +22,7 @@ class StripeConfig:
 
     @staticmethod
     def create_checkout_session(
-        amount_cents: int, currency: str = PaymentConstants.CURRENCY, success_url: str = "", cancel_url: str = "", metadata: Optional[dict] = None
+        amount_cents: int, currency: str = PaymentConstants.CAD_CURRENCY, success_url: str = "", cancel_url: str = "", metadata: Optional[dict] = None
     ) -> stripe.checkout.Session:
         """Create a Stripe checkout session"""
         return stripe.checkout.Session.create(

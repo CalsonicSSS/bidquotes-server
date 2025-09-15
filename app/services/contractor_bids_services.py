@@ -332,6 +332,7 @@ class BidService:
 
             else:
                 # Regular update (not draft submission) for either draft update or submitted bid update
+                # NO status change for regular updates in any case
                 result = await self.supabase_client.table("bids").update(update_data).eq("id", bid_id).execute()
                 if not result.data:
                     raise DatabaseError("Failed to update bid")
@@ -340,7 +341,7 @@ class BidService:
 
                 logger.info(f"✅ Bid updated successfully: {updated_bid.id}")
                 return BidCreationResponse(
-                    status=BidCreationStatus.SUBMITTED,  # Assume already submitted bid
+                    status=BidCreationStatus.BID_UPDATE_ONLY,
                     bid=updated_bid,
                     payment_required=False,
                     message="Bid updated successfully!",
