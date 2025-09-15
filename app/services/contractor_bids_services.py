@@ -260,11 +260,36 @@ class BidService:
                 # Validation
                 await self._validate_job_available_for_bidding(current_bid["job_id"], contractor_id)
 
-                # ✅ Check credits first before draft submission
+                # ✅ NEW: Check if payment was already completed for this bid
+                has_payment = await self.payment_service.has_completed_payment_for_bid(contractor_id, bid_id)
                 has_credits = await self.payment_service.can_use_credit_for_bid(contractor_id)
 
-                if has_credits:
-                    # Has credits: Submit the draft
+                print(f"has_payment: {has_payment}, has_credits: {has_credits}")
+
+                if has_payment:
+                    # Payment was completed - proceed with submission
+                    update_data["status"] = BidStatus.SUBMITTED.value
+
+                    # Update bid
+                    result = await self.supabase_client.table("bids").update(update_data).eq("id", bid_id).execute()
+                    if not result.data:
+                        raise DatabaseError("Failed to update bid")
+
+                    updated_bid = BidResponse(**result.data[0])
+
+                    # Check if this is the 5th bid for job closure
+                    await self._check_and_close_job_if_needed(current_bid["job_id"])
+
+                    logger.info(f"✅ Paid draft bid submitted successfully: {updated_bid.id}")
+                    return BidCreationResponse(
+                        status=BidCreationStatus.SUBMITTED,
+                        bid=updated_bid,
+                        payment_required=False,
+                        message="Draft bid submitted successfully with payment!",
+                    )
+
+                elif has_credits:
+                    # Has credits - use credit and submit
                     update_data["status"] = BidStatus.SUBMITTED.value
 
                     # Update bid
@@ -280,15 +305,16 @@ class BidService:
                     # Check if this is the 5th bid for job closure
                     await self._check_and_close_job_if_needed(current_bid["job_id"])
 
-                    logger.info(f"✅ Draft bid submitted successfully: {updated_bid.id}")
+                    logger.info(f"✅ Draft bid submitted successfully with credit: {updated_bid.id}")
                     return BidCreationResponse(
-                        status=BidCreationStatus.SUBMITTED, bid=updated_bid, payment_required=False, message="Draft bid submitted successfully!"
+                        status=BidCreationStatus.SUBMITTED,
+                        bid=updated_bid,
+                        payment_required=False,
+                        message="Draft bid submitted successfully with credit!",
                     )
 
                 else:
-                    # No credits: Update the draft but keep as draft, require payment
-                    # Don't change status to SUBMITTED
-
+                    # No payment and no credits - require payment
                     # Update bid (without changing status)
                     result = await self.supabase_client.table("bids").update(update_data).eq("id", bid_id).execute()
                     if not result.data:

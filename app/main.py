@@ -12,7 +12,7 @@ from app.routes.contractor_profile_routes import contractor_profile_router
 from app.routes.contractor_bids_routes import bid_router
 from fastapi.exceptions import RequestValidationError
 from app.custom_error import EmailValidationError
-from app.configs.stripe_config import StripeConfig
+from app.routes.payments_credits_routes import payments_credits_router
 
 
 @asynccontextmanager
@@ -70,6 +70,7 @@ app.include_router(buyer_job_router, prefix=settings.API_V1_STR)
 app.include_router(contractor_profile_router, prefix=settings.API_V1_STR)
 app.include_router(contractor_jobs_router, prefix=settings.API_V1_STR)
 app.include_router(bid_router, prefix=settings.API_V1_STR)
+app.include_router(payments_credits_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

@@ -102,13 +102,15 @@ class PaymentService:
             draft_bid = bid_result.data
 
             # Create success/cancel URLs that return to draft submission page
+            # These will be used inside the StripeConfig.create_checkout_session later
             base_url = settings.CLIENT_DOMAIN
-            success_url = f"{base_url}/contractor-dashboard/post-bid?draft={draft_bid_id}&payment=success&session_id={{CHECKOUT_SESSION_ID}}"
+            success_url = f"{base_url}/contractor-dashboard/payment-success?draft={draft_bid_id}"
             cancel_url = f"{base_url}/contractor-dashboard/post-bid?draft={draft_bid_id}&payment=cancelled"
 
             # Metadata to track this payment
+            # This will be used inside the StripeConfig.create_checkout_session later
             metadata = {
-                "product_name": "Bid Submission Fee",
+                "product_name": "Bid Submission Fee",  # this will display in Stripe session checkout redirect page
                 "item_type": "bid_payment",
                 "contractor_id": contractor_id,
                 "job_id": draft_bid["job_id"],
@@ -116,7 +118,8 @@ class PaymentService:
                 "bid_title": draft_bid["title"],
             }
 
-            # Create Stripe checkout session
+            # Create Stripe checkout session (THIS IS THE CORE FUNCTIONALITY AND IS FULLY HANDLED BY STRIPE)
+            # it will return a session id and url to redirect to the checkout page (which is fully hosted by Stripe)
             session = StripeConfig.create_checkout_session(
                 amount_cents=PaymentConstants.BID_PAYMENT_AMOUNT_CAD, success_url=success_url, cancel_url=cancel_url, metadata=metadata
             )
@@ -137,6 +140,30 @@ class PaymentService:
         except Exception as e:
             logger.error(f"Error creating draft bid checkout session: {str(e)}")
             raise ValidationError(f"Failed to create payment session: {str(e)}")
+
+    # ---------------------------------------------------------------------------------------------------------------------
+
+    async def has_completed_payment_for_bid(self, contractor_id: str, bid_id: str) -> bool:
+        """Check if contractor has completed payment for specific bid"""
+        print("has_completed_payment_for_bid called")
+        try:
+            # Look for successful payment transaction for this specific bid
+            result = (
+                await self.supabase_client.table("payment_transactions")
+                .select("id")
+                .eq("contractor_id", contractor_id)
+                .eq("bid_id", bid_id)
+                .eq("status", "succeeded")
+                .execute()
+            )
+
+            print(f"Payment check result: {len(result.data) > 0}")
+
+            return len(result.data) > 0
+
+        except Exception as e:
+            logger.error(f"Error checking payment for bid: {str(e)}")
+            return False
 
     # ---------------------------------------------------------------------------------------------------------------------
 
