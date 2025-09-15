@@ -12,6 +12,7 @@ from app.routes.contractor_profile_routes import contractor_profile_router
 from app.routes.contractor_bids_routes import bid_router
 from fastapi.exceptions import RequestValidationError
 from app.custom_error import EmailValidationError
+from app.configs.stripe_config import StripeConfig
 
 
 @asynccontextmanager
@@ -74,3 +75,12 @@ app.include_router(bid_router, prefix=settings.API_V1_STR)
 @app.get("/")
 async def root():
     return {"message": "Welcome to Bidquotes API"}
+
+
+@app.get("/test-stripe")
+async def test_stripe():
+    try:
+        # Just test that Stripe is configured
+        return {"stripe_configured": True, "api_key_present": bool(settings.STRIPE_SECRET_KEY)}
+    except Exception as e:
+        return {"error": str(e)}

@@ -44,5 +44,4 @@ class ContractorProfileResponse(BaseModel):
     additional_information: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    credit_count: int
     images: List[ContractorProfileImageResponse] = []

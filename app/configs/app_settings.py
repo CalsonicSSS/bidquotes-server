@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     # API Settings
     API_V1_STR: str = "/api/v1"
 
+    # Stripe
+    STRIPE_SECRET_KEY: str
+
+    # domains
+    CLIENT_DOMAIN: str
+
     class Config:
         env_file = ".env"
         case_sensitive = True
