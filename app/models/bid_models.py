@@ -69,6 +69,19 @@ class BidDetailResponse(BaseModel):
     job_city: str
 
 
+# for payment logic handling
+class BidCreationStatus(str, Enum):
+    SUBMITTED = "submitted"  # Bid successfully submitted (had credits)
+    DRAFT_PAYMENT_REQUIRED = "draft_payment_required"  # Saved as draft, payment needed
+
+
+class BidCreationResponse(BaseModel):
+    status: BidCreationStatus
+    bid: BidResponse  # The created bid (either submitted or draft)
+    payment_required: bool
+    message: str
+
+
 # ------------------------------------------------------
 # buyer side
 

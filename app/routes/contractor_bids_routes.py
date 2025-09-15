@@ -3,7 +3,7 @@ from supabase import AsyncClient
 from app.utils.supabase_client_handlers import get_supabase_client
 from app.utils.user_auth import get_current_clerk_user_id
 from app.services.contractor_bids_services import BidService
-from app.models.bid_models import BidCreate, BidDraftCreate, BidResponse, BidDetailResponse, BidCardResponse
+from app.models.bid_models import BidCreate, BidDraftCreate, BidResponse, BidDetailResponse, BidCardResponse, BidCreationResponse
 from typing import Optional, List
 
 bid_router = APIRouter(prefix="/bids", tags=["Bids"])
@@ -18,7 +18,7 @@ async def get_bid_service(supabase_client: AsyncClient = Depends(get_supabase_cl
 
 
 # checked
-@bid_router.post("", response_model=BidResponse)
+@bid_router.post("", response_model=BidCreationResponse)
 async def create_bid(
     job_id: str = Form(...),
     title: str = Form(...),
@@ -28,7 +28,7 @@ async def create_bid(
     clerk_user_id: str = Depends(get_current_clerk_user_id),
     bid_service: BidService = Depends(get_bid_service),
 ):
-    """Create new bid submission"""
+    """Create a new bid submission or draft"""
 
     # Create bid data
     bid_data = BidCreate(
@@ -74,7 +74,7 @@ async def save_bid_draft(
 
 
 # checked
-@bid_router.put("/{bid_id}", response_model=BidResponse)
+@bid_router.put("/{bid_id}", response_model=BidCreationResponse)
 async def update_bid(
     bid_id: str,
     is_draft_submit: bool = Query(False, alias="is-draft-submit"),

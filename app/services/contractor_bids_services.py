@@ -1,10 +1,21 @@
 from supabase import AsyncClient
-from app.models.bid_models import BidCardResponse, BidCreate, BidDraftCreate, BidResponse, BidDetailResponse, BidStatus
+from app.models.bid_models import (
+    BidCardResponse,
+    BidCreate,
+    BidDraftCreate,
+    BidResponse,
+    BidDetailResponse,
+    BidStatus,
+    BidCreationResponse,
+    BidCreationStatus,
+)
 from app.custom_error import UserNotFoundError, DatabaseError, ServerError, ValidationError
 from typing import List, Optional
 import logging
 
 from app.models.job_models import JobStatus
+from app.services.payment_mgnt_services import PaymentService
+
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +23,7 @@ logger = logging.getLogger(__name__)
 class BidService:
     def __init__(self, supabase_client: AsyncClient):
         self.supabase_client = supabase_client
+        self.payment_service = PaymentService(supabase_client)
 
     async def _get_user_id(self, clerk_user_id: str) -> str:
         """Helper method to get user_id from clerk_user_id"""
@@ -97,13 +109,20 @@ class BidService:
         except ValueError as e:
             raise ValidationError("Invalid price format provided")
 
+    # --------------------------------------------------------------------------------------------------------------------------------------------
+
+    async def _check_and_close_job_if_needed(self, job_id: str):
+        """Check if job should be closed after bid submission"""
+        job_bids = await self.supabase_client.table("bids").select("id").eq("job_id", job_id).eq("status", BidStatus.SUBMITTED.value).execute()
+        if len(job_bids.data) == 5:
+            await self.supabase_client.table("jobs").update({"status": JobStatus.CLOSED.value}).eq("id", job_id).execute()
+
     # =====================================================================================================
     # CORE BID OPERATIONS
     # =====================================================================================================
 
-    # checked
-    async def create_bid(self, clerk_user_id: str, bid_data: BidCreate) -> BidResponse:
-        """Create a new bid submission"""
+    async def create_bid(self, clerk_user_id: str, bid_data: BidCreate) -> BidCreationResponse:
+        """Create a new bid submission or draft if no credits"""
         try:
             contractor_id = await self._get_user_id(clerk_user_id)
 
@@ -116,37 +135,57 @@ class BidService:
             # Validate bid data
             self._validate_bid_data(bid_data.price_min, bid_data.price_max)
 
-            # Perform Stripe payment flow here or consume 1 contractor credit for this bid fee for free
+            # ✅ Check credits first
+            has_credits = await self.payment_service.can_use_credit_for_bid(contractor_id)
 
-            # Once payment is confirmed, prepare bid record and submit
+            # Prepare bid record
             bid_record = bid_data.model_dump()
             bid_record["contractor_id"] = contractor_id
-            bid_record["status"] = BidStatus.SUBMITTED.value
 
-            # Create bid
-            result = await self.supabase_client.table("bids").insert(bid_record).execute()
-            if not result.data:
-                raise DatabaseError("Failed to create your bid")
+            if has_credits:
+                # Normal flow: Submit bid immediately
+                bid_record["status"] = BidStatus.SUBMITTED.value
 
-            bid = BidResponse(**result.data[0])
+                # Create bid
+                result = await self.supabase_client.table("bids").insert(bid_record).execute()
+                if not result.data:
+                    raise DatabaseError("Failed to create your bid")
 
-            # Once this bid is fully submitted (either payment processed success or 1 contractor credit consumed), Check if its the 5th bid one for this job
-            # if it is, we will need to update the job status to CLOSED (VERY IMPORTANT)
+                bid = BidResponse(**result.data[0])
 
-            job_bids = (
-                await self.supabase_client.table("bids").select("id").eq("job_id", bid_data.job_id).eq("status", BidStatus.SUBMITTED.value).execute()
-            )
-            if len(job_bids.data) == 5:
-                await self.supabase_client.table("jobs").update({"status": JobStatus.CLOSED.value}).eq("id", bid_data.job_id).execute()
+                # Consume credit for successful bid submission
+                await self.payment_service.use_credit_for_bid(contractor_id=contractor_id, job_id=bid_data.job_id, bid_id=bid.id)
 
-            logger.info(f"✅ Bid created successfully: {bid.id}")
-            return bid
+                # Check if this is the 5th bid for job closure
+                await self._check_and_close_job_if_needed(bid_data.job_id)
+
+                logger.info(f"✅ Bid submitted successfully: {bid.id}")
+                return BidCreationResponse(status=BidCreationStatus.SUBMITTED, bid=bid, payment_required=False, message="Bid submitted successfully!")
+
+            else:
+                # No credits: Auto save as draft for payment first
+                bid_record["status"] = BidStatus.DRAFT.value
+
+                # Create draft bid
+                result = await self.supabase_client.table("bids").insert(bid_record).execute()
+                if not result.data:
+                    raise DatabaseError("Failed to create draft bid")
+
+                draft_bid = BidResponse(**result.data[0])
+
+                logger.info(f"✅ Draft bid created for payment: {draft_bid.id}")
+                return BidCreationResponse(
+                    status=BidCreationStatus.DRAFT_PAYMENT_REQUIRED,
+                    bid=draft_bid,
+                    payment_required=True,
+                    message="Bid saved as draft. Payment required to submit.",
+                )
 
         except Exception as e:
             logger.error(f"Error creating bid - {str(e)}")
             if isinstance(e, (UserNotFoundError, DatabaseError, ValidationError)):
                 raise e
-            raise ServerError(f"Failed to create your bid")
+            raise DatabaseError(f"Failed to create bid: {str(e)}")
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -190,8 +229,9 @@ class BidService:
     # --------------------------------------------------------------------------------------------------------------------------------------------
 
     # checked
-    async def update_bid(self, clerk_user_id: str, bid_id: str, bid_data: BidCreate, is_draft_submit: bool = False) -> BidResponse:
-        """Update existing bid"""
+
+    async def update_bid(self, clerk_user_id: str, bid_id: str, bid_data: BidCreate, is_draft_submit: bool) -> BidCreationResponse:
+        """Update existing bid or submit draft"""
         try:
             contractor_id = await self._get_user_id(clerk_user_id)
 
@@ -215,43 +255,76 @@ class BidService:
             if price_min is not None and price_max is not None:
                 self._validate_bid_data(price_min, price_max)
 
-            # Handle draft submission case
+            # Handle draft submission case (convert draft to submitted)
             if is_draft_submit and current_bid["status"] == BidStatus.DRAFT.value:
-                # validation
+                # Validation
                 await self._validate_job_available_for_bidding(current_bid["job_id"], contractor_id)
 
-                # Perform Stripe payment flow or consume 1 contractor credit for this bid fee for free
+                # ✅ Check credits first before draft submission
+                has_credits = await self.payment_service.can_use_credit_for_bid(contractor_id)
 
-                # once payment is confirmed, update status to SUBMITTED
-                update_data["status"] = BidStatus.SUBMITTED.value
+                if has_credits:
+                    # Has credits: Submit the draft
+                    update_data["status"] = BidStatus.SUBMITTED.value
 
-                # Once this bid is fully submitted + payment processed, we need to check if it this is the full bid as this is the 5th one for this job
-                # if it is, we will need to update the job status to CLOSED (VERY IMPORTANT)
-                job_bids = (
-                    await self.supabase_client.table("bids")
-                    .select("*")
-                    .eq("job_id", current_bid["job_id"])
-                    .eq("status", BidStatus.SUBMITTED.value)
-                    .execute()
+                    # Update bid
+                    result = await self.supabase_client.table("bids").update(update_data).eq("id", bid_id).execute()
+                    if not result.data:
+                        raise DatabaseError("Failed to update bid")
+
+                    updated_bid = BidResponse(**result.data[0])
+
+                    # Consume credit for successful draft submission
+                    await self.payment_service.use_credit_for_bid(contractor_id=contractor_id, job_id=updated_bid.job_id, bid_id=updated_bid.id)
+
+                    # Check if this is the 5th bid for job closure
+                    await self._check_and_close_job_if_needed(current_bid["job_id"])
+
+                    logger.info(f"✅ Draft bid submitted successfully: {updated_bid.id}")
+                    return BidCreationResponse(
+                        status=BidCreationStatus.SUBMITTED, bid=updated_bid, payment_required=False, message="Draft bid submitted successfully!"
+                    )
+
+                else:
+                    # No credits: Update the draft but keep as draft, require payment
+                    # Don't change status to SUBMITTED
+
+                    # Update bid (without changing status)
+                    result = await self.supabase_client.table("bids").update(update_data).eq("id", bid_id).execute()
+                    if not result.data:
+                        raise DatabaseError("Failed to update draft bid")
+
+                    updated_draft = BidResponse(**result.data[0])
+
+                    logger.info(f"✅ Draft bid updated, payment required: {updated_draft.id}")
+                    return BidCreationResponse(
+                        status=BidCreationStatus.DRAFT_PAYMENT_REQUIRED,
+                        bid=updated_draft,
+                        payment_required=True,
+                        message="Draft updated. Payment required to submit.",
+                    )
+
+            else:
+                # Regular update (not draft submission) for either draft update or submitted bid update
+                result = await self.supabase_client.table("bids").update(update_data).eq("id", bid_id).execute()
+                if not result.data:
+                    raise DatabaseError("Failed to update bid")
+
+                updated_bid = BidResponse(**result.data[0])
+
+                logger.info(f"✅ Bid updated successfully: {updated_bid.id}")
+                return BidCreationResponse(
+                    status=BidCreationStatus.SUBMITTED,  # Assume already submitted bid
+                    bid=updated_bid,
+                    payment_required=False,
+                    message="Bid updated successfully!",
                 )
-                if len(job_bids.data) == 5:
-                    await self.supabase_client.table("jobs").update({"status": JobStatus.CLOSED.value}).eq("id", current_bid["job_id"]).execute()
-
-            # Update bid
-            result = await self.supabase_client.table("bids").update(update_data).eq("id", bid_id).execute()
-            if not result.data:
-                raise DatabaseError("Failed to update your bid")
-
-            updated_bid = BidResponse(**result.data[0])
-
-            logger.info(f"✅ Bid updated: {bid_id}")
-            return updated_bid
 
         except Exception as e:
             logger.error(f"Error updating bid - {str(e)}")
             if isinstance(e, (UserNotFoundError, DatabaseError, ValidationError)):
                 raise e
-            raise ServerError(f"Failed to update your bid")
+            raise DatabaseError(f"Failed to update bid: {str(e)}")
 
     # --------------------------------------------------------------------------------------------------------------------------------------------
 

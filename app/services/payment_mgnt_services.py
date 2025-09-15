@@ -80,21 +80,40 @@ class PaymentService:
 
     # ---------------------------------------------------------------------------------------------------------------------
 
-    async def create_checkout_session_for_bid_fee(self, contractor_id: str, job_id: str, bid_id: str) -> Dict[str, str]:
-        """Create Stripe checkout session for bid payment"""
+    # the bid id here is always in draft status for per bid payments
+    # so we just name it as draft_bid_id to avoid confusion
+    async def create_checkout_session_for_draft_bid_payment(self, contractor_id: str, draft_bid_id: str) -> Dict[str, str]:
+        """Create Stripe checkout session for draft bid payment"""
         try:
-            # Create success/cancel URLs that return to job detail page
+            # Verify the draft bid exists and belongs to this contractor
+            bid_result = (
+                await self.supabase_client.table("bids")
+                .select("*")
+                .eq("id", draft_bid_id)
+                .eq("contractor_id", contractor_id)
+                .eq("status", "draft")
+                .single()
+                .execute()
+            )
+
+            if not bid_result.data:
+                raise ValidationError("Draft bid not found or not owned by contractor")
+
+            draft_bid = bid_result.data
+
+            # Create success/cancel URLs that return to draft submission page
             base_url = settings.CLIENT_DOMAIN
-            success_url = f"{base_url}/contractor-dashboard?section=browse-jobs&payment=success&session_id={{CHECKOUT_SESSION_ID}}"
-            cancel_url = f"{base_url}/contractor-dashboard/jobs/{job_id}?payment=cancelled"
+            success_url = f"{base_url}/contractor-dashboard/post-bid?draft={draft_bid_id}&payment=success&session_id={{CHECKOUT_SESSION_ID}}"
+            cancel_url = f"{base_url}/contractor-dashboard/post-bid?draft={draft_bid_id}&payment=cancelled"
 
             # Metadata to track this payment
             metadata = {
                 "product_name": "Bid Submission Fee",
                 "item_type": "bid_payment",
                 "contractor_id": contractor_id,
-                "job_id": job_id,
-                "bid_id": bid_id,
+                "job_id": draft_bid["job_id"],
+                "bid_id": draft_bid_id,
+                "bid_title": draft_bid["title"],
             }
 
             # Create Stripe checkout session
@@ -108,15 +127,15 @@ class PaymentService:
                 stripe_session_id=session.id,
                 item_type="bid_payment",
                 amount_cad=PaymentConstants.BID_PAYMENT_AMOUNT_CAD / 100,  # Convert cents to dollars
-                job_id=job_id,
-                bid_id=bid_id,
+                job_id=draft_bid["job_id"],
+                bid_id=draft_bid_id,
                 credits_purchased=0,
             )
 
             return {"session_id": session.id, "session_url": session.url}
 
         except Exception as e:
-            logger.error(f"Error creating bid checkout session: {str(e)}")
+            logger.error(f"Error creating draft bid checkout session: {str(e)}")
             raise ValidationError(f"Failed to create payment session: {str(e)}")
 
     # ---------------------------------------------------------------------------------------------------------------------
