@@ -63,7 +63,7 @@ class PaymentService:
             "stripe_session_id": stripe_session_id,
             "item_type": item_type,
             "amount_cad": amount_cad,
-            "currency": PaymentConstants.CURRENCY,
+            "currency": PaymentConstants.CAD_CURRENCY,
             "status": "pending",
             "credits_purchased": credits_purchased,
         }
@@ -87,7 +87,7 @@ class PaymentService:
 
     async def create_checkout_session_for_draft_bid_payment(self, contractor_id: str, draft_bid_id: str) -> Dict[str, str]:
         """Create Stripe checkout session for draft bid payment"""
-        print("create_checkout_session_for_draft_bid_payment called")
+        # print("create_checkout_session_for_draft_bid_payment called")
         try:
             # Verify the draft bid exists and belongs to this contractor
             bid_result = (
@@ -144,7 +144,7 @@ class PaymentService:
 
     async def has_completed_payment_for_bid(self, contractor_id: str, bid_id: str) -> bool:
         """Check if contractor has completed payment for specific bid"""
-        print("has_completed_payment_for_bid called")
+        # print("has_completed_payment_for_bid called")
         try:
             # Look for successful payment transaction for this specific bid
             result = (

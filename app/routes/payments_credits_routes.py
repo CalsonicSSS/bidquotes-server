@@ -61,3 +61,20 @@ async def get_contractor_credits(
     credits = await payment_service.get_contractor_credits(contractor_id)
 
     return CreditBalanceResponse(credits=credits)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+
+
+@payments_credits_router.post("/create-credit-purchase", response_model=CheckoutSessionResponse)
+async def create_credit_purchase(
+    clerk_user_id: str = Depends(get_current_clerk_user_id),
+    payment_service: PaymentService = Depends(get_payment_service),
+):
+    """Create Stripe checkout session for credit purchase ($700 for 20 credits)"""
+
+    contractor_id = await get_contractor_user_id(clerk_user_id, payment_service)
+
+    result = await payment_service.create_checkout_session_for_credits_purchase(contractor_id=contractor_id)
+
+    return CheckoutSessionResponse(**result)
