@@ -40,7 +40,9 @@ class PaymentService:
 
     async def can_use_credit_for_bid(self, contractor_id: str) -> bool:
         """Check if contractor has credits available for bid"""
+        # print("can_use_credit_for_bid called")
         credits = await self.get_contractor_credits(contractor_id)
+        # print(f"Contractor {contractor_id} has {credits} credits")
         return credits > 0
 
     # ---------------------------------------------------------------------------------------------------------------------
@@ -85,6 +87,7 @@ class PaymentService:
 
     async def create_checkout_session_for_draft_bid_payment(self, contractor_id: str, draft_bid_id: str) -> Dict[str, str]:
         """Create Stripe checkout session for draft bid payment"""
+        print("create_checkout_session_for_draft_bid_payment called")
         try:
             # Verify the draft bid exists and belongs to this contractor
             bid_result = (
@@ -126,6 +129,8 @@ class PaymentService:
                 metadata=metadata,
             )
 
+            print(f"Created Stripe session: {session.id}")
+
             # ❌ REMOVED: No longer creating payment record here!
             # We'll create it in the webhook when payment actually succeeds
 
@@ -151,7 +156,7 @@ class PaymentService:
                 .execute()
             )
 
-            print(f"Payment check result: {len(result.data) > 0}")
+            print(f"has bid Payment check result: {len(result.data) > 0}")
 
             return len(result.data) > 0
 

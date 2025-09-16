@@ -123,6 +123,7 @@ class BidService:
 
     async def create_bid(self, clerk_user_id: str, bid_data: BidCreate) -> BidCreationResponse:
         """Create a new bid submission or draft if no credits"""
+        # print("create_bid called")
         try:
             contractor_id = await self._get_user_id(clerk_user_id)
 
@@ -143,6 +144,7 @@ class BidService:
             bid_record["contractor_id"] = contractor_id
 
             if has_credits:
+                # print("new bid submission - has credits case")
                 # Normal flow: Submit bid immediately
                 bid_record["status"] = BidStatus.SUBMITTED.value
 
@@ -163,10 +165,11 @@ class BidService:
                 return BidCreationResponse(status=BidCreationStatus.SUBMITTED, bid=bid, payment_required=False, message="Bid submitted successfully!")
 
             else:
+                # print("new bid submission - no credits case")
                 # No credits: Auto save as draft for payment first
                 bid_record["status"] = BidStatus.DRAFT.value
 
-                # Create draft bid
+                # Create draft bid for payment processing
                 result = await self.supabase_client.table("bids").insert(bid_record).execute()
                 if not result.data:
                     raise DatabaseError("Failed to create draft bid")
@@ -260,14 +263,14 @@ class BidService:
                 # Validation
                 await self._validate_job_available_for_bidding(current_bid["job_id"], contractor_id)
 
-                # ✅ NEW: Check if payment was already completed for this bid
+                # ✅ Check if payment was already completed for this bid
                 has_payment = await self.payment_service.has_completed_payment_for_bid(contractor_id, bid_id)
                 has_credits = await self.payment_service.can_use_credit_for_bid(contractor_id)
 
-                print(f"has_payment: {has_payment}, has_credits: {has_credits}")
-
                 if has_payment:
-                    # Payment was completed - proceed with submission
+                    # print("draft bid submit: has_payment is True")
+
+                    # Payment was completed - proceed with submission by updating status to submitted (very important)
                     update_data["status"] = BidStatus.SUBMITTED.value
 
                     # Update bid
@@ -289,7 +292,9 @@ class BidService:
                     )
 
                 elif has_credits:
-                    # Has credits - use credit and submit
+                    # print("draft bid submit: has_credits is True")
+
+                    # Has credits - use credit and submit the bid by updating status to submitted (very important)
                     update_data["status"] = BidStatus.SUBMITTED.value
 
                     # Update bid
@@ -316,6 +321,7 @@ class BidService:
                 else:
                     # No payment and no credits - require payment
                     # Update bid (without changing status)
+                    # print("draft bid submit: No payment and no credits")
                     result = await self.supabase_client.table("bids").update(update_data).eq("id", bid_id).execute()
                     if not result.data:
                         raise DatabaseError("Failed to update draft bid")
@@ -333,6 +339,7 @@ class BidService:
             else:
                 # Regular update (not draft submission) for either draft update or submitted bid update
                 # NO status change for regular updates in any case
+                # print("Regular bid update case")
                 result = await self.supabase_client.table("bids").update(update_data).eq("id", bid_id).execute()
                 if not result.data:
                     raise DatabaseError("Failed to update bid")
