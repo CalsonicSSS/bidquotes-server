@@ -8,8 +8,8 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 # Payment constants for your business model
 class PaymentConstants:
-    BID_PAYMENT_AMOUNT_CAD = 7  # for testing now (7000) $70.00 CAD in cents
-    CREDIT_PURCHASE_AMOUNT_CAD = 70  # for testing now (70000) $700.00 CAD in cents
+    BID_PAYMENT_AMOUNT_CAD = 70  # for testing now (7000) $70.00 CAD in cents
+    CREDIT_PURCHASE_AMOUNT_CAD = 700  # for testing now (70000) $700.00 CAD in cents
     CREDIT_PURCHASE_QUANTITY = 20  # Credits received per purchase
     CAD_CURRENCY = "cad"
 

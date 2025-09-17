@@ -67,14 +67,14 @@ app.add_middleware(
 
 
 # Include routers
-app.include_router(user_router, prefix=settings.API_V1_STR)
+app.include_router(stripe_webhook_router)  # no prefix for webhooks
 app.include_router(clerk_webhook_router)  # no prefix for webhooks
 app.include_router(buyer_job_router, prefix=settings.API_V1_STR)
 app.include_router(contractor_profile_router, prefix=settings.API_V1_STR)
 app.include_router(contractor_jobs_router, prefix=settings.API_V1_STR)
 app.include_router(bid_router, prefix=settings.API_V1_STR)
 app.include_router(payments_credits_router, prefix=settings.API_V1_STR)
-app.include_router(stripe_webhook_router)  # no prefix for webhooks
+app.include_router(user_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")
