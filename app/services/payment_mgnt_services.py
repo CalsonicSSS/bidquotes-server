@@ -59,9 +59,7 @@ class PaymentService:
 
     async def can_use_credit_for_bid(self, contractor_id: str) -> bool:
         """Check if contractor has credits available for bid"""
-        # print("can_use_credit_for_bid called")
         credits = await self.get_contractor_credits(contractor_id)
-        # print(f"Contractor {contractor_id} has {credits} credits")
         return credits > 0
 
     # ---------------------------------------------------------------------------------------------------------------------
@@ -199,6 +197,7 @@ class PaymentService:
             # Create credit usage transaction
             new_balance = current_credits - 1
 
+            # directly insert record into the credit_transactions table
             await self.supabase_client.table("credit_transactions").insert(
                 {
                     "contractor_id": contractor_id,
