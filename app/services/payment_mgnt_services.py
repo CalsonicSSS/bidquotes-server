@@ -1,9 +1,8 @@
-import stripe
 from supabase import AsyncClient
 from app.configs.stripe_config import StripeConfig, PaymentConstants
 from app.configs.app_settings import settings
 from app.custom_error import DatabaseError, ValidationError
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,6 +11,26 @@ logger = logging.getLogger(__name__)
 class PaymentService:
     def __init__(self, supabase_client: AsyncClient):
         self.supabase_client = supabase_client
+
+    # ######################################################################################################################
+    # Helper methods:
+    # ######################################################################################################################
+
+    async def _get_contractor_email(self, contractor_id: str) -> Optional[str]:
+        """Get contractor email for receipt delivery"""
+        try:
+            # Get contractor always from contractor_profiles table
+            profile_result = await self.supabase_client.table("contractor_profiles").select("email").eq("user_id", contractor_id).single().execute()
+
+            if profile_result.data and profile_result.data.get("email"):
+                return profile_result.data["email"]
+
+            logger.warning(f"No email found for contractor {contractor_id}")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error getting contractor email: {str(e)}")
+            return None
 
     # ---------------------------------------------------------------------------------------------------------------------
 
@@ -47,48 +66,15 @@ class PaymentService:
 
     # ---------------------------------------------------------------------------------------------------------------------
 
-    async def _create_payment_transaction_record(
-        self,
-        contractor_id: str,
-        stripe_session_id: str,
-        item_type: str,
-        amount_cad: float,
-        job_id: Optional[str] = None,
-        bid_id: Optional[str] = None,
-        credits_purchased: int = 0,
-    ):
-        """Create payment transaction record in database"""
-        payment_data = {
-            "contractor_id": contractor_id,
-            "stripe_session_id": stripe_session_id,
-            "item_type": item_type,
-            "amount_cad": amount_cad,
-            "currency": PaymentConstants.CAD_CURRENCY,
-            "status": "pending",
-            "credits_purchased": credits_purchased,
-        }
-
-        if job_id:
-            payment_data["job_id"] = job_id
-        if bid_id:
-            payment_data["bid_id"] = bid_id
-
-        result = await self.supabase_client.table("payment_transactions").insert(payment_data).execute()
-
-        if not result.data:
-            raise DatabaseError("Failed to create payment transaction record")
-
-        return result.data[0]
-
-    # ---------------------------------------------------------------------------------------------------------------------
-
     # the bid id here is always in draft status for per bid payments
     # so we just name it as draft_bid_id to avoid confusion
 
     async def create_checkout_session_for_draft_bid_payment(self, contractor_id: str, draft_bid_id: str) -> Dict[str, str]:
-        """Create Stripe checkout session for draft bid payment"""
-        # print("create_checkout_session_for_draft_bid_payment called")
+        """Create Stripe checkout session for draft bid payment with receipt email"""
         try:
+            # GET CONTRACTOR EMAIL FOR RECEIPT
+            contractor_email = await self._get_contractor_email(contractor_id)
+
             # Verify the draft bid exists and belongs to this contractor
             bid_result = (
                 await self.supabase_client.table("bids")
@@ -121,19 +107,16 @@ class PaymentService:
                 "credits_purchased": "0",  # This is not a credit purchase
             }
 
-            # Create Stripe checkout session
+            # 🎯 PASS EMAIL TO CREATE CHECKOUT SESSION
             session = StripeConfig.create_checkout_session(
                 amount_cents=PaymentConstants.BID_PAYMENT_AMOUNT_CAD,
                 success_url=success_url,
                 cancel_url=cancel_url,
                 metadata=metadata,
+                customer_email=contractor_email,
             )
 
-            print(f"Created Stripe session: {session.id}")
-
-            # ❌ REMOVED: No longer creating payment record here!
-            # We'll create it in the webhook when payment actually succeeds
-
+            print(f"Created Stripe session with receipt email: {session.id}")
             return {"session_id": session.id, "session_url": session.url}
 
         except Exception as e:
@@ -167,8 +150,11 @@ class PaymentService:
     # ---------------------------------------------------------------------------------------------------------------------
 
     async def create_checkout_session_for_credits_purchase(self, contractor_id: str) -> Dict[str, str]:
-        """Create Stripe checkout session for credit purchase"""
+        """Create Stripe checkout session for credit purchase with receipt email"""
         try:
+            # 🎯 GET CONTRACTOR EMAIL FOR RECEIPT
+            contractor_email = await self._get_contractor_email(contractor_id)
+
             # Create success/cancel URLs that return to credits page
             base_url = settings.CLIENT_DOMAIN
             success_url = f"{base_url}/contractor-dashboard?section=your-credits&payment=success&session_id={{CHECKOUT_SESSION_ID}}"
@@ -184,18 +170,19 @@ class PaymentService:
                 # No job_id or bid_id for credit purchases
             }
 
-            # Create Stripe checkout session
+            # 🎯 PASS EMAIL TO CREATE CHECKOUT SESSION
             session = StripeConfig.create_checkout_session(
-                amount_cents=PaymentConstants.CREDIT_PURCHASE_AMOUNT_CAD, success_url=success_url, cancel_url=cancel_url, metadata=metadata
+                amount_cents=PaymentConstants.CREDIT_PURCHASE_AMOUNT_CAD,
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata=metadata,
+                customer_email=contractor_email,
             )
-
-            # ❌ REMOVED: No longer creating payment record here!
-            # We'll create it in the webhook when payment actually succeeds
 
             return {"session_id": session.id, "session_url": session.url}
 
         except Exception as e:
-            logger.error(f"Error creating credit checkout session: {str(e)}")
+            logger.error(f"Error creating credit purchase checkout session: {str(e)}")
             raise ValidationError(f"Failed to create payment session: {str(e)}")
 
     # ---------------------------------------------------------------------------------------------------------------------
@@ -228,12 +215,3 @@ class PaymentService:
         except Exception as e:
             logger.error(f"Error using credit for bid: {str(e)}")
             raise DatabaseError(f"Failed to process credit usage: {str(e)}")
-
-    # ######################################################################################################################
-    # Post-payment processing (to be called by webhook handler)
-    # ######################################################################################################################
-
-    async def process_successful_payment(self, session_id: str):
-        """Process successful payment (called by webhook) - we'll implement this next"""
-        # Implementation coming in next step when we build webhooks
-        pass
