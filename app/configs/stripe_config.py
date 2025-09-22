@@ -13,9 +13,6 @@ class PaymentConstants:
     CREDIT_PURCHASE_QUANTITY = 20  # Credits received per purchase
     CAD_CURRENCY = "cad"
 
-    # Success/Cancel URLs (we'll use these later)
-    DOMAIN = os.getenv("NEXT_PUBLIC_API_URL", "http://127.0.0.1:3000")
-
 
 class StripeConfig:
     """Simple wrapper for common Stripe operations"""
@@ -52,6 +49,9 @@ class StripeConfig:
             "payment_intent_data": {"receipt_email": customer_email} if customer_email else {},  # This enables automatic receipt emails!
             # Optional: Pre-fill email in checkout form
             "customer_email": customer_email if customer_email else None,
+            # Enable automatic tax collection
+            "automatic_tax": {"enabled": True},
+            "billing_address_collection": "required",  # Require billing address for tax purposes
         }
 
         # Only add payment_intent_data if customer_email is provided
