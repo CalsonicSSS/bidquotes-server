@@ -27,7 +27,26 @@ class Settings(BaseSettings):
     CLIENT_DOMAIN: str
 
     class Config:
-        env_file = ".env"
+        # You can explicitly tell Pydantic which file to target -> So you are not forced to use a specific name; you just tell Pydantic which one.
+        # here, Pydantic (via python-dotenv) will try to open “.env” relative to the CWD of python running process.
+        # this means where (path directory) is the terminal when you run `python main.py` or `uvicorn main:app --reload`
+
+        # When running locally:
+        # 1. System environment variables are checked first
+        # 2. If a variable isn't found in the system environment, BaseSettings will load it from your .env file (we will always have .env file locally)
+        # 3. Automatic loading - No need to explicitly call load_dotenv() or import python-dotenv in your code, as pydantic-settings handles that for you.
+
+        # when in production
+        # 1. there is no .env file, but environment variables are set in the deployment environment manager (e.g. render dashboard).
+        # 2. BaseSettings will only retrieve values from the system environment variables
+        # 3. Graceful handling - If the .env file doesn't exist, Pydantic won't throw an error - it just won't load anything from it
+
+        # priority handling, the order is:
+        # 1. System environment variables (highest priority)
+        # 2. .env file (if it exists)
+        # 3. Default values in the Settings class (lowest priority)
+
+        env_file = ".env"  # Pydantic will try to load this file (using python-dotenv under the hood) and read variables from it.
         case_sensitive = True
 
 

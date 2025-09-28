@@ -51,7 +51,7 @@ class StripeConfig:
             "customer_email": customer_email if customer_email else None,
             # Enable automatic tax collection
             "automatic_tax": {"enabled": True},
-            "billing_address_collection": "required",  # Require billing address for tax purposes
+            "billing_address_collection": "required",  # Require billing address for tax purposes / customer tax collection rate is based on customer location
         }
 
         # Only add payment_intent_data if customer_email is provided
