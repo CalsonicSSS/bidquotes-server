@@ -45,7 +45,7 @@ class JobService:
     async def _upload_single_image(self, file_content: bytes, file_name: str, job_id: str) -> tuple[str, str]:
         """Internal: Upload single image and return (image_url, storage_path)"""
         try:
-            # Generate storage path
+            # Generate storage path (this will create a unique folder / file path on the supabase storage)
             storage_path = f"{job_id}/{uuid.uuid4()}"
 
             # Upload to Supabase Storage
