@@ -49,7 +49,7 @@ class AdminJobDetailResponse(BaseModel):
     description: str
     location_address: str
     city: str
-    other_requirements: Optional[str]
+    other_requirements: Optional[str] = None
     status: str
     is_validated: bool
     created_at: datetime
