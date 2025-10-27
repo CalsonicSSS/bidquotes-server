@@ -46,9 +46,9 @@ class AdminJobDetailResponse(BaseModel):
     title: str
     job_type: str
     job_budget: str
-    description: Optional[str]
-    location_address: Optional[str]
-    city: Optional[str]
+    description: str
+    location_address: str
+    city: str
     other_requirements: Optional[str]
     status: str
     is_validated: bool
