@@ -1,5 +1,5 @@
 from supabase import AsyncClient
-from app.models.admin_models import (
+from app.models.admin_job_models import (
     AdminJobCardResponse,
     AdminJobDetailResponse,
     PaginatedJobsResponse,
@@ -14,7 +14,7 @@ import math
 logger = logging.getLogger(__name__)
 
 
-class AdminService:
+class AdminJobService:
     def __init__(self, supabase_client: AsyncClient):
         self.supabase_client = supabase_client
 
