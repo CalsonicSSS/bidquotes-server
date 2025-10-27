@@ -166,6 +166,25 @@ class AdminJobService:
     async def delete_job(self, job_id: str) -> bool:
         """Delete a job (for fake/noise jobs)"""
         try:
+            # select this job to confirm it exists
+            job_result = await self.supabase_client.table("jobs").select("id").eq("id", job_id).single().execute()
+
+            if not job_result.data:
+                raise ValidationError("Job not found")
+
+            # Get all image records for this job with their storage path
+            image_result = await self.supabase_client.table("job_images").select("storage_path").eq("job_id", job_id).execute()
+
+            if image_result.data:
+                # Delete image file from storage
+                storage_paths = [img["storage_path"] for img in image_result.data if img.get("storage_path")]
+                await self.supabase_client.storage.from_("job-images").remove(storage_paths)
+
+                # Delete all image records from job_images table
+                await self.supabase_client.table("job_images").delete().eq("job_id", job_id).execute()
+
+                logger.info(f"✅ Deleted {len(storage_paths)} images for job {job_id}")
+
             result = await self.supabase_client.table("jobs").delete().eq("id", job_id).execute()
 
             if not result.data:
