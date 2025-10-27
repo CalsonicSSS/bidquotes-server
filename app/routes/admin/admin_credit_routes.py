@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from supabase import AsyncClient
 from app.utils.supabase_client_handlers import get_supabase_client
-from app.services.admin_credit_services import AdminCreditService
-from app.models.admin_credit_models import JobBidInquiryResponse, AddCreditRequest, AddCreditResponse
+from app.services.admin.admin_credit_services import AdminCreditService
+from app.models.admin.admin_credit_models import JobBidInquiryResponse, AddCreditRequest, AddCreditResponse
 
 admin_credit_router = APIRouter(prefix="/admin/credits", tags=["Admin"])
 

@@ -1,5 +1,5 @@
 from supabase import AsyncClient
-from app.models.admin_job_models import (
+from app.models.admin.admin_job_models import (
     AdminJobCardResponse,
     AdminJobDetailResponse,
     PaginatedJobsResponse,

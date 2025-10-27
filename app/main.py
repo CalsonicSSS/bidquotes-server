@@ -13,8 +13,9 @@ from app.routes.contractor_bids_routes import bid_router
 from fastapi.exceptions import RequestValidationError
 from app.custom_error import EmailValidationError
 from app.routes.payments_credits_routes import payments_credits_router
-from app.routes.admin_job_routes import admin_job_router
-from app.routes.admin_credit_routes import admin_credit_router
+from app.routes.admin.admin_job_routes import admin_job_router
+from app.routes.admin.admin_credit_routes import admin_credit_router
+from app.routes.admin.admin_financial_routes import admin_financial_router
 
 # stripe webhook route
 from app.routes.stripe_webhook_route import stripe_webhook_router
@@ -79,6 +80,7 @@ app.include_router(payments_credits_router, prefix=settings.API_V1_STR)
 app.include_router(user_router, prefix=settings.API_V1_STR)
 app.include_router(admin_job_router)
 app.include_router(admin_credit_router)
+app.include_router(admin_financial_router)
 
 
 @app.get("/")

@@ -1,5 +1,5 @@
 from supabase import AsyncClient
-from app.models.admin_credit_models import (
+from app.models.admin.admin_credit_models import (
     JobBidInquiryResponse,
     ContractorContactResponse,
     BuyerContactResponse,

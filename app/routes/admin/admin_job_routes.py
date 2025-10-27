@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from supabase import AsyncClient
 from app.utils.supabase_client_handlers import get_supabase_client
-from app.services.admin_job_services import AdminJobService
-from app.models.admin_job_models import PaginatedJobsResponse, AdminJobDetailResponse
+from app.services.admin.admin_job_services import AdminJobService
+from app.models.admin.admin_job_models import PaginatedJobsResponse, AdminJobDetailResponse
 
 admin_job_router = APIRouter(prefix="/admin/jobs", tags=["Admin"])
 
