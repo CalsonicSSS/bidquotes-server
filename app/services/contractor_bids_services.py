@@ -14,7 +14,7 @@ from typing import List, Optional
 import logging
 
 from app.models.job_models import JobStatus
-from app.services.payment_mgnt_services import PaymentService
+from app.services.payment_credits_services import PaymentService
 
 
 logger = logging.getLogger(__name__)

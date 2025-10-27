@@ -4,7 +4,7 @@ import stripe
 import json
 import logging
 from app.utils.supabase_client_handlers import get_supabase_client
-from app.services.payment_mgnt_services import PaymentService
+from app.services.payment_credits_services import PaymentService
 from app.models.stripe_webhook_models import StripeWebhookEventResponse
 from app.configs.app_settings import settings
 from app.custom_error import WebhookError

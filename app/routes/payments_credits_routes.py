@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from supabase import AsyncClient
 from app.utils.supabase_client_handlers import get_supabase_client
 from app.utils.user_auth import get_current_clerk_user_id
-from app.services.payment_mgnt_services import PaymentService
+from app.services.payment_credits_services import PaymentService
 from app.models.payment_models import DraftBidPaymentRequest, CheckoutSessionResponse, CreditBalanceResponse
 
 payments_credits_router = APIRouter(prefix="/payments", tags=["Payments"])

@@ -186,7 +186,7 @@ class PaymentService:
     # ---------------------------------------------------------------------------------------------------------------------
 
     async def use_credit_for_bid(self, contractor_id: str, job_id: str, bid_id: str):
-        """Consume 1 credit for bid submission (free bid)"""
+        """Consume 1 credit for bid submission (free bid through contractor credit)"""
         try:
             # Get current balance
             current_credits = await self.get_contractor_credits(contractor_id)
