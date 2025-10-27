@@ -23,6 +23,7 @@
 - "uvicorn app.main:app --reload" 
     - to start the fastapi process 
     - specifically under the "app" folder in "main" file for "app" declaraction
+    - default binds the server app to computer/host's localhost ip and port 8000
 
 
 ------------------------------------------------------------------------------------------------------------------- 
