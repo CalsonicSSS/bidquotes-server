@@ -53,3 +53,14 @@ deploy on render you need to add:
 - start command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 - add additional env variable: "PORT: 8000"
+
+
+-------------------------------------------------------------------------------------------------------------------
+
+Dev vs production
+
+- the Dev line is always on the "development" branch with all env variable set to dev version (except the supabase)
+
+- workflow: all dev in development branch -> pull & merge to main branch -> sync development branch   
+
+- render has the dev deployment (mainly for the webhook connection for clerk and stripe)

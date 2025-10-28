@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str
     STRIPE_WEBHOOK_SECRET: str
 
+    # Resend API Key
+    RESEND_API_KEY: str
+
     # domains
     CLIENT_DOMAIN: str
 
