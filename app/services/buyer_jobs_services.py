@@ -15,6 +15,7 @@ from typing import List, Optional, Tuple
 import logging
 import uuid
 import mimetypes
+from app.services.email_services import EmailService
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,28 @@ class JobService:
                 await self._upload_to_storage_create_image_records(job.id, image_files)
 
             logger.info(f"✅ Job created with {len(image_files) if image_files else 0} images, at job id: {job.id}")
+
+            # 📧 NEW: Send email notification to internal team
+            try:
+                # Get buyer email for notification
+                buyer_result = await self.supabase_client.table("buyer_profiles").select("contact_email").eq("user_id", user_id).single().execute()
+                buyer_email = buyer_result.data["contact_email"] if buyer_result.data else "N/A"
+
+                # Send email notification
+                EmailService.send_new_job_notification(
+                    job_id=job.id,
+                    job_title=job.title,
+                    job_type=job.job_type,
+                    job_budget=job.job_budget,
+                    location_address=job.location_address,
+                    city=job.city,
+                    description=job.description,
+                    buyer_email=buyer_email,
+                )
+            except Exception as email_error:
+                # Log but don't fail job creation if email fails
+                logger.warning(f"⚠️ Email notification failed for job {job.id}: {str(email_error)}")
+
             return job
 
         except Exception as e:
